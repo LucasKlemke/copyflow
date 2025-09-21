@@ -1,103 +1,218 @@
-import Image from "next/image";
+"use client";
+
+import { useRouter } from "next/navigation";
+
+import { FileText, MoreHorizontal, Plus } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+
+const documentTemplates = [
+  {
+    id: "blank",
+    name: "Criar novo criativo",
+    icon: Plus,
+    color: "border-dashed border-gray-300 hover:border-gray-400",
+    bgColor: "bg-white",
+  },
+  {
+    id: "letter",
+    name: "Carta",
+    subtitle: "Spearmint",
+    color: "border-blue-200",
+    bgColor: "bg-blue-50",
+  },
+  {
+    id: "resume1",
+    name: "Currículo",
+    subtitle: "Serif",
+    color: "border-green-200",
+    bgColor: "bg-green-50",
+  },
+  {
+    id: "resume2",
+    name: "Currículo",
+    subtitle: "Coral",
+    color: "border-yellow-200",
+    bgColor: "bg-yellow-50",
+  },
+  {
+    id: "proposal",
+    name: "Proposta de projeto",
+    subtitle: "Tropic",
+    color: "border-purple-200",
+    bgColor: "bg-purple-50",
+  },
+  {
+    id: "brochure",
+    name: "Folheto",
+    subtitle: "Geometric",
+    color: "border-pink-200",
+    bgColor: "bg-pink-50",
+  },
+  {
+    id: "report",
+    name: "Relatório",
+    subtitle: "Luxe",
+    color: "border-indigo-200",
+    bgColor: "bg-indigo-50",
+  },
+];
+
+const recentDocuments = [
+  {
+    id: "template-iot",
+    name: "Template-IoT",
+    lastOpened: "Aberto em 13 de set de 2023",
+  },
+  {
+    id: "cold-email-examples",
+    name: "Cold Email Examples",
+    lastOpened: "Aberto em 5 de set de 2023",
+  },
+  {
+    id: "cold-email-systemprompt",
+    name: "Cold Email SystemPrompt",
+    lastOpened: "Aberto em 4 de set de 2023",
+  },
+  {
+    id: "sistema-agendamento",
+    name: "Sistema de Agendamento",
+    lastOpened: "Aberto em 27 de jul de 2023",
+  },
+];
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const router = useRouter();
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const handleTemplateClick = (templateId: string) => {
+    if (templateId === "blank") {
+      router.push("/project/create");
+    }
+  };
+
+  return (
+    <div className="mx-auto max-w-7xl px-6 py-8">
+      {/* Header Section */}
+      <div className="mb-8 flex items-center justify-between">
+        <h1 className="text-2xl font-medium text-gray-900">
+          Iniciar um novo documento
+        </h1>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-600">Galeria de modelos</span>
+          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </div>
+
+      {/* Template Gallery */}
+      <div className="mb-12 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7">
+        {documentTemplates.map(template => {
+          const IconComponent = template.icon;
+          return (
+            <Card
+              key={template.id}
+              className={`group h-40 cursor-pointer transition-all hover:shadow-md ${template.color} ${template.bgColor}`}
+              onClick={() => handleTemplateClick(template.id)}
+            >
+              <CardContent className="flex h-full flex-col items-center justify-center p-4">
+                {template.id === "blank" ? (
+                  <Plus className="mb-4 h-12 w-12 text-blue-600" />
+                ) : (
+                  <div className="mb-4 h-16 w-full rounded-sm bg-white/80 shadow-sm">
+                    {/* Placeholder for document preview */}
+                    <div className="flex h-full items-center justify-center">
+                      <div className="space-y-1">
+                        <div className="h-1 w-12 rounded bg-gray-300"></div>
+                        <div className="h-1 w-8 rounded bg-gray-300"></div>
+                        <div className="h-1 w-10 rounded bg-gray-300"></div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div className="text-center">
+                  <h3 className="text-sm font-medium text-gray-900">
+                    {template.name}
+                  </h3>
+                  {template.subtitle && (
+                    <p className="text-xs text-gray-600">{template.subtitle}</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* Recent Documents Section */}
+      <div className="mb-8 flex items-center justify-between">
+        <h2 className="text-xl font-medium text-gray-900">
+          Documentos recentes
+        </h2>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-600">
+            Pertencente a qualquer pessoa
+          </span>
+          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Recent Documents Grid */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+        {recentDocuments.map(document => (
+          <Card
+            key={document.id}
+            className="group cursor-pointer transition-all hover:shadow-md"
+          >
+            <CardContent className="p-0">
+              {/* Document Preview */}
+              <div className="h-48 bg-gray-50 p-4">
+                <div className="space-y-2">
+                  <div className="h-3 w-full rounded bg-gray-800"></div>
+                  <div className="space-y-1">
+                    <div className="h-2 w-full rounded bg-gray-300"></div>
+                    <div className="h-2 w-4/5 rounded bg-gray-300"></div>
+                    <div className="h-2 w-3/4 rounded bg-gray-300"></div>
+                    <div className="h-2 w-full rounded bg-gray-300"></div>
+                    <div className="h-2 w-2/3 rounded bg-gray-300"></div>
+                  </div>
+                  <div className="mt-4 space-y-1">
+                    <div className="h-2 w-full rounded bg-gray-300"></div>
+                    <div className="h-2 w-5/6 rounded bg-gray-300"></div>
+                    <div className="h-2 w-4/5 rounded bg-gray-300"></div>
+                    <div className="h-2 w-full rounded bg-gray-300"></div>
+                    <div className="h-2 w-3/4 rounded bg-gray-300"></div>
+                    <div className="h-2 w-2/3 rounded bg-gray-300"></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Document Info */}
+              <div className="flex items-center gap-3 p-4">
+                <div className="flex h-6 w-6 items-center justify-center">
+                  <FileText className="h-4 w-4 text-blue-600" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="truncate text-sm font-medium text-gray-900">
+                    {document.name}
+                  </h3>
+                  <p className="text-xs text-gray-600">{document.lastOpened}</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
+                >
+                  <MoreHorizontal className="h-3 w-3" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 }

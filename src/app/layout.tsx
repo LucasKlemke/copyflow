@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+
+import { ExpandableSidebar } from "@/components/expandable-sidebar";
+import { Header } from "@/components/header";
+
 import "./globals.css";
 
 const geistSans = Geist({
@@ -27,7 +31,15 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <div className="min-h-screen">
+          <ExpandableSidebar />
+          <div className="pl-16">
+            {/* Add padding to account for collapsed sidebar */}
+            <Header />
+
+            <main>{children}</main>
+          </div>
+        </div>
       </body>
     </html>
   );
