@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+import { usePathname, useRouter } from "next/navigation";
 
 import {
   BarChart3,
@@ -8,6 +10,7 @@ import {
   FileText,
   Folder,
   Home,
+  Plus,
   Settings,
   Star,
   Trash2,
@@ -18,22 +21,122 @@ import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Separator } from "./ui/separator";
 
-const menuItems = [
-  { icon: Home, label: "Início", count: null },
-  { icon: FileText, label: "Documentos", count: 12 },
-  { icon: Folder, label: "Projetos", count: 8 },
-  { icon: Star, label: "Favoritos", count: 5 },
-  { icon: Clock, label: "Recentes", count: null },
-];
+interface MenuItemType {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  count: number | null;
+  route: string;
+  id: string;
+}
 
-const secondaryItems = [
-  { icon: Users, label: "Compartilhados", count: 3 },
-  { icon: BarChart3, label: "Relatórios", count: null },
-  { icon: Trash2, label: "Lixeira", count: 7 },
-];
+interface Project {
+  id: string;
+  name: string;
+  createdAt: string;
+}
 
 export function ExpandableSidebar() {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [project, setProject] = useState<Project | null>(null);
+  const [criativos, setCriativos] = useState<any[]>([]);
+  const router = useRouter();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    // Load project and criativos data
+    const currentProject = localStorage.getItem("currentProject");
+    if (currentProject) {
+      setProject(JSON.parse(currentProject));
+    }
+
+    // Mock criativos data (in real app, this would come from API)
+    const mockCriativos = [
+      { id: "1", status: "concluido" },
+      { id: "2", status: "em-revisao" },
+      { id: "3", status: "rascunho" },
+    ];
+    setCriativos(mockCriativos);
+  }, []);
+
+  const menuItems: MenuItemType[] = [
+    {
+      icon: Home,
+      label: "Dashboard",
+      count: null,
+      route: "/dashboard",
+      id: "dashboard",
+    },
+    {
+      icon: FileText,
+      label: "Criativos",
+      count: criativos.length,
+      route: "/dashboard",
+      id: "criativos",
+    },
+    {
+      icon: Star,
+      label: "Favoritos",
+      count: criativos.filter(c => c.status === "concluido").length,
+      route: "/dashboard?filter=favoritos",
+      id: "favoritos",
+    },
+    {
+      icon: Clock,
+      label: "Recentes",
+      count: null,
+      route: "/dashboard?filter=recentes",
+      id: "recentes",
+    },
+  ];
+
+  const secondaryItems: MenuItemType[] = [
+    {
+      icon: Folder,
+      label: "Projeto",
+      count: null,
+      route: "/onboarding",
+      id: "projeto",
+    },
+    {
+      icon: BarChart3,
+      label: "Relatórios",
+      count: null,
+      route: "/relatorios",
+      id: "relatorios",
+    },
+    {
+      icon: Trash2,
+      label: "Lixeira",
+      count: criativos.filter(c => c.status === "rascunho").length,
+      route: "/dashboard?filter=rascunhos",
+      id: "lixeira",
+    },
+  ];
+
+  const handleMenuClick = (item: MenuItemType) => {
+    if (item.id === "relatorios") {
+      // Feature not implemented yet
+      alert("Relatórios será implementado em breve!");
+      return;
+    }
+
+    router.push(item.route);
+  };
+
+  const handleSettingsClick = () => {
+    router.push("/onboarding");
+  };
+
+  const handleCreateVSL = () => {
+    router.push("/criativos/vsl/create");
+  };
+
+  const isActiveRoute = (route: string) => {
+    if (route === "/dashboard") {
+      return pathname === "/dashboard";
+    }
+    return pathname.startsWith(route);
+  };
 
   return (
     <aside
@@ -46,13 +149,18 @@ export function ExpandableSidebar() {
         {/* Logo/Brand */}
         <div className="border-sidebar-border border-b p-4">
           <div className="flex items-center gap-3">
-            <div className="bg-sidebar-primary flex h-8 w-8 items-center justify-center rounded-lg">
-              <div className="bg-sidebar-primary-foreground h-4 w-4 rounded-sm" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600">
+              <span className="text-sm font-bold text-white">C</span>
             </div>
             {isExpanded && (
-              <span className="text-sidebar-foreground font-medium">
-                Dashboard
-              </span>
+              <div className="flex flex-col">
+                <span className="font-medium text-gray-900">CopyFlow</span>
+                {project && (
+                  <span className="truncate text-xs text-gray-600">
+                    {project.name}
+                  </span>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -62,20 +170,29 @@ export function ExpandableSidebar() {
           <div className="space-y-1">
             {menuItems.map((item, index) => {
               const IconComponent = item.icon;
+              const isActive = isActiveRoute(item.route);
               return (
                 <Button
                   key={index}
                   variant="ghost"
-                  className={`text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground h-12 w-full justify-start gap-3 ${
+                  onClick={() => handleMenuClick(item)}
+                  className={`h-12 w-full justify-start gap-3 transition-colors ${
                     !isExpanded ? "px-2" : ""
+                  } ${
+                    isActive
+                      ? "bg-blue-50 text-blue-600 hover:bg-blue-100"
+                      : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
                   }`}
                 >
                   <IconComponent className="size-5 flex-shrink-0" />
                   {isExpanded && (
                     <>
                       <span className="flex-1 text-left">{item.label}</span>
-                      {item.count && (
-                        <Badge variant="secondary" className="ml-auto text-xs">
+                      {item.count !== null && (
+                        <Badge
+                          variant={isActive ? "default" : "secondary"}
+                          className="ml-auto text-xs"
+                        >
                           {item.count}
                         </Badge>
                       )}
@@ -86,25 +203,51 @@ export function ExpandableSidebar() {
             })}
           </div>
 
-          {isExpanded && <Separator className="bg-sidebar-border my-4" />}
+          {isExpanded && <Separator className="my-4 bg-gray-200" />}
+
+          {/* Quick Actions */}
+          <div className="mb-4 space-y-1">
+            <Button
+              onClick={handleCreateVSL}
+              className={`h-10 w-full justify-start gap-3 bg-blue-600 text-white hover:bg-blue-700 ${
+                !isExpanded ? "px-2" : ""
+              }`}
+            >
+              <Plus className="size-4 flex-shrink-0" />
+              {isExpanded && (
+                <span className="flex-1 text-left text-sm">Criar VSL</span>
+              )}
+            </Button>
+          </div>
+
+          {isExpanded && <Separator className="my-3 bg-gray-200" />}
 
           <div className="space-y-1">
             {secondaryItems.map((item, index) => {
               const IconComponent = item.icon;
+              const isActive = isActiveRoute(item.route);
               return (
                 <Button
                   key={index}
                   variant="ghost"
-                  className={`text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground h-12 w-full justify-start gap-3 ${
+                  onClick={() => handleMenuClick(item)}
+                  className={`h-12 w-full justify-start gap-3 transition-colors ${
                     !isExpanded ? "px-2" : ""
+                  } ${
+                    isActive
+                      ? "bg-blue-50 text-blue-600 hover:bg-blue-100"
+                      : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
                   }`}
                 >
                   <IconComponent className="size-5 flex-shrink-0" />
                   {isExpanded && (
                     <>
                       <span className="flex-1 text-left">{item.label}</span>
-                      {item.count && (
-                        <Badge variant="secondary" className="ml-auto text-xs">
+                      {item.count !== null && (
+                        <Badge
+                          variant={isActive ? "default" : "secondary"}
+                          className="ml-auto text-xs"
+                        >
                           {item.count}
                         </Badge>
                       )}
@@ -117,10 +260,11 @@ export function ExpandableSidebar() {
         </nav>
 
         {/* Settings */}
-        <div className="border-sidebar-border border-t p-2">
+        <div className="border-t border-gray-200 p-2">
           <Button
             variant="ghost"
-            className={`text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground h-12 w-full justify-start gap-3 ${
+            onClick={handleSettingsClick}
+            className={`h-12 w-full justify-start gap-3 text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 ${
               !isExpanded ? "px-2" : ""
             }`}
           >

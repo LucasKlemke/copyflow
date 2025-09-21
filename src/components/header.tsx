@@ -1,4 +1,17 @@
-import { ChevronDown, Menu, MoreVertical, Search } from "lucide-react";
+"use client";
+
+import { useEffect, useState } from "react";
+
+import { useRouter } from "next/navigation";
+
+import {
+  ChevronDown,
+  LogOut,
+  Menu,
+  MoreVertical,
+  Search,
+  User,
+} from "lucide-react";
 
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -10,7 +23,45 @@ import {
   SelectValue,
 } from "./ui/select";
 
+interface UserData {
+  email: string;
+  name: string;
+}
+
+interface ProjectData {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
 export function Header() {
+  const router = useRouter();
+  const [user, setUser] = useState<UserData | null>(null);
+  const [project, setProject] = useState<ProjectData | null>(null);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+
+  useEffect(() => {
+    const userData = localStorage.getItem("user");
+    const projectData = localStorage.getItem("currentProject");
+
+    if (userData) {
+      setUser(JSON.parse(userData));
+    }
+
+    if (projectData) {
+      setProject(JSON.parse(projectData));
+    }
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("user");
+    localStorage.removeItem("currentProject");
+    router.push("/auth/login");
+  };
+
+  if (!user) {
+    return null; // Don't show header if user is not logged in
+  }
   return (
     <header className="border-b border-gray-200 bg-white px-6 py-3">
       <div className="flex items-center gap-4">
@@ -20,18 +71,15 @@ export function Header() {
             <Menu className="size-5 text-gray-600" />
           </Button>
           <div className="flex items-center gap-2">
-            <Select defaultValue="projeto1">
-              <SelectTrigger className="w-48 border-0 bg-transparent transition-colors hover:bg-gray-100">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="projeto1">Projeto Principal</SelectItem>
-                <SelectItem value="projeto2">Design System</SelectItem>
-                <SelectItem value="projeto3">Mobile App</SelectItem>
-                <SelectItem value="projeto4">Website</SelectItem>
-                <SelectItem value="projeto5">Marketing</SelectItem>
-              </SelectContent>
-            </Select>
+            {project ? (
+              <div className="rounded-md bg-gray-100 px-3 py-2">
+                <span className="font-medium text-gray-900">
+                  {project.name}
+                </span>
+              </div>
+            ) : (
+              <span className="text-gray-600">CopyFlow</span>
+            )}
           </div>
         </div>
 
@@ -48,11 +96,58 @@ export function Header() {
 
         {/* Right side */}
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" className="p-2">
-            <MoreVertical className="size-5 text-gray-600" />
-          </Button>
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600">
-            <span className="text-sm text-white">U</span>
+          <div className="relative">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="flex items-center gap-2 px-3"
+              onClick={() => setShowUserMenu(!showUserMenu)}
+            >
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600">
+                <span className="text-sm text-white">
+                  {user.name.charAt(0).toUpperCase()}
+                </span>
+              </div>
+              <span className="text-sm font-medium text-gray-700">
+                {user.name}
+              </span>
+              <ChevronDown className="h-4 w-4 text-gray-500" />
+            </Button>
+
+            {showUserMenu && (
+              <div className="absolute top-full right-0 z-50 mt-2 w-48 rounded-md border bg-white shadow-lg">
+                <div className="py-1">
+                  <div className="border-b px-4 py-2">
+                    <p className="text-sm font-medium text-gray-900">
+                      {user.name}
+                    </p>
+                    <p className="text-xs text-gray-600">{user.email}</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start px-4 py-2 text-sm"
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      router.push("/onboarding");
+                    }}
+                  >
+                    <User className="mr-2 h-4 w-4" />
+                    Configurações do Projeto
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      handleLogout();
+                    }}
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Sair
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

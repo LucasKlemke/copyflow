@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+
 import { useRouter } from "next/navigation";
 
 import { FileText, MoreHorizontal, Plus } from "lucide-react";
@@ -85,9 +87,26 @@ const recentDocuments = [
 export default function Home() {
   const router = useRouter();
 
+  useEffect(() => {
+    // Check if user is authenticated
+    const user = localStorage.getItem("user");
+    if (user) {
+      // User is logged in, check if they have a project
+      const currentProject = localStorage.getItem("currentProject");
+      if (currentProject) {
+        router.push("/dashboard");
+      } else {
+        router.push("/onboarding");
+      }
+    } else {
+      // User is not logged in, redirect to landing page
+      router.push("/landing");
+    }
+  }, [router]);
+
   const handleTemplateClick = (templateId: string) => {
     if (templateId === "blank") {
-      router.push("/project/create");
+      router.push("/criativos/vsl/create");
     }
   };
 

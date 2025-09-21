@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useRouter } from "next/navigation";
 
@@ -26,41 +26,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+import type {
+  ChatMessage,
+  Project,
+  SuggestedAction,
+  VSLFormData,
+  VSLResult,
+} from "@/types";
 
-interface VSLFormData {
-  tipo: string;
-  duracao: string;
-  abordagem: string;
-  cta: string;
-  elementos: string[];
-}
-
-interface VSLResult {
-  script: string;
-  slides: string[];
-  tempoEstimado: {
-    introducao: string;
-    desenvolvimento: string;
-    cta: string;
-    total: string;
-  };
-  ctasPositions: string[];
-  teleprompter: string;
-}
-
-interface ChatMessage {
-  id: string;
-  text: string;
-  isUser: boolean;
-  timestamp: Date;
-}
-
-interface SuggestedAction {
-  id: string;
-  label: string;
-  description: string;
-  icon: React.ComponentType<{ className?: string }>;
-}
+// Types are now imported from @/types
 
 const tiposVSL = [
   { id: "curta", label: "VSL Curta", subtitle: "Produto até R$ 497" },
@@ -127,35 +101,40 @@ const elementos = [
   { id: "garantia", label: "Garantia Destacada", subtitle: "", emoji: "📞" },
 ];
 
-const suggestedActions: SuggestedAction[] = [
+const suggestedActions = [
   {
     id: "improve-hook",
     label: "Melhorar Gancho",
     description: "Torne a abertura mais impactante",
     icon: Zap,
+    actionType: "improve" as const,
   },
   {
     id: "add-urgency",
     label: "Adicionar Urgência",
     description: "Insira elementos de escassez de tempo",
     icon: Lightbulb,
+    actionType: "improve" as const,
   },
   {
     id: "enhance-cta",
     label: "Fortalecer CTA",
     description: "Melhore o call-to-action final",
     icon: Edit3,
+    actionType: "improve" as const,
   },
   {
     id: "add-social-proof",
     label: "Incluir Prova Social",
     description: "Adicione depoimentos e casos de sucesso",
     icon: MessageSquare,
+    actionType: "improve" as const,
   },
 ];
 
 export default function CreateVSL() {
   const router = useRouter();
+  const [project, setProject] = useState<Project | null>(null);
   const [formData, setFormData] = useState<VSLFormData>({
     tipo: "",
     duracao: "",
@@ -163,6 +142,24 @@ export default function CreateVSL() {
     cta: "",
     elementos: [],
   });
+
+  useEffect(() => {
+    // Check authentication and project
+    const user = localStorage.getItem("user");
+    const currentProject = localStorage.getItem("currentProject");
+
+    if (!user) {
+      router.push("/auth/login");
+      return;
+    }
+
+    if (!currentProject) {
+      router.push("/onboarding");
+      return;
+    }
+
+    setProject(JSON.parse(currentProject));
+  }, [router]);
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [vslResult, setVslResult] = useState<VSLResult | null>(null);
@@ -333,15 +330,13 @@ export default function CreateVSL() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => router.back()}
+          onClick={() => router.push("/dashboard")}
           className="h-8 w-8 p-0"
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-2xl font-medium text-gray-900">
-            Criar Novo Criativo - VSL
-          </h1>
+          <h1 className="text-2xl font-medium text-gray-900">Criar VSL</h1>
           <p className="text-sm text-gray-600">
             Configure os parâmetros para gerar seu script de VSL personalizado
           </p>
