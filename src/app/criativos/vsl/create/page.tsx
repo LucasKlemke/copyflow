@@ -179,6 +179,111 @@ export default function CreateVSL() {
   const [isLeftPanelVisible, setIsLeftPanelVisible] = useState(true);
   const [isFabOpen, setIsFabOpen] = useState(false);
 
+  // Utility functions for real-time stats
+  const calculateWordCount = (text: string): number => {
+    if (!text.trim()) return 0;
+    return text.trim().split(/\s+/).length;
+  };
+
+  const calculateReadingTime = (text: string): string => {
+    const words = calculateWordCount(text);
+    const wordsPerMinute = 150; // Average speaking rate
+    const minutes = Math.ceil(words / wordsPerMinute);
+
+    if (minutes < 1) return "< 1 min";
+    if (minutes === 1) return "1 min";
+    return `${minutes} min`;
+  };
+
+  const calculateCharacterCount = (text: string): number => {
+    return text.length;
+  };
+
+  const countParagraphs = (text: string): number => {
+    if (!text.trim()) return 0;
+    return text.split(/\n\s*\n/).filter(p => p.trim().length > 0).length;
+  };
+
+  const countCTAs = (text: string): number => {
+    // Common CTA phrases in Portuguese
+    const ctaPatterns = [
+      /clique\s+(?:no\s+)?botão/gi,
+      /acesse\s+(?:o\s+)?link/gi,
+      /compre\s+agora/gi,
+      /adquira\s+(?:já|agora)/gi,
+      /garanta\s+(?:sua|a)\s+vaga/gi,
+      /aproveite\s+(?:essa|esta)\s+oferta/gi,
+      /não\s+perca/gi,
+      /última\s+chance/gi,
+      /entre\s+em\s+contato/gi,
+      /cadastre-se/gi,
+      /inscreva-se/gi,
+    ];
+
+    return ctaPatterns.reduce((count, pattern) => {
+      const matches = text.match(pattern);
+      return count + (matches ? matches.length : 0);
+    }, 0);
+  };
+
+  const estimateVideoLength = (text: string): string => {
+    const words = calculateWordCount(text);
+    const wordsPerMinute = 140; // Slightly slower for video
+    const totalMinutes = words / wordsPerMinute;
+
+    if (totalMinutes < 1) return "< 1 min";
+
+    const minutes = Math.floor(totalMinutes);
+    const seconds = Math.round((totalMinutes - minutes) * 60);
+
+    if (minutes === 0) return `${seconds}s`;
+    if (seconds === 0) return `${minutes} min`;
+    return `${minutes}:${seconds.toString().padStart(2, "0")} min`;
+  };
+
+  const getContentQualityScore = (
+    text: string
+  ): { score: number; feedback: string } => {
+    const words = calculateWordCount(text);
+    const ctas = countCTAs(text);
+    const paragraphs = countParagraphs(text);
+
+    let score = 0;
+    let feedback = "";
+
+    // Word count scoring (0-40 points)
+    if (words >= 800) score += 40;
+    else if (words >= 500) score += 30;
+    else if (words >= 300) score += 20;
+    else if (words >= 100) score += 10;
+
+    // CTA scoring (0-30 points)
+    if (ctas >= 3) score += 30;
+    else if (ctas >= 2) score += 20;
+    else if (ctas >= 1) score += 10;
+
+    // Structure scoring (0-30 points)
+    if (paragraphs >= 8) score += 30;
+    else if (paragraphs >= 5) score += 20;
+    else if (paragraphs >= 3) score += 10;
+
+    // Generate feedback
+    if (score >= 80) feedback = "Excelente! VSL bem estruturada";
+    else if (score >= 60) feedback = "Boa estrutura, pode melhorar";
+    else if (score >= 40) feedback = "Estrutura básica, adicione mais conteúdo";
+    else if (score >= 20) feedback = "Precisa de mais desenvolvimento";
+    else feedback = "Comece escrevendo seu script";
+
+    return { score, feedback };
+  };
+
+  const getScoreColor = (score: number): string => {
+    if (score >= 80) return "text-green-600";
+    if (score >= 60) return "text-yellow-600";
+    if (score >= 40) return "text-orange-600";
+    return "text-red-600";
+  };
+
   const handleElementoToggle = (elementoId: string) => {
     setFormData(prev => ({
       ...prev,
@@ -679,9 +784,57 @@ export default function CreateVSL() {
                 {/* Content Header */}
                 <div className="border-b bg-white px-6 py-4">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-medium">Script da VSL</h2>
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <span>Última atualização: agora</span>
+                    <div>
+                      <h2 className="text-lg font-medium">Script da VSL</h2>
+                      {editableScript.trim() && (
+                        <div className="mt-1 flex items-center gap-4 text-xs text-gray-500">
+                          <span>
+                            {calculateWordCount(editableScript)} palavras
+                          </span>
+                          <span>•</span>
+                          <span>
+                            {estimateVideoLength(editableScript)} estimado
+                          </span>
+                          <span>•</span>
+                          <span
+                            className={getScoreColor(
+                              getContentQualityScore(editableScript).score
+                            )}
+                          >
+                            {getContentQualityScore(editableScript).score}%
+                            qualidade
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {editableScript.trim() && (
+                        <div className="flex items-center gap-2">
+                          <div className="h-1 w-16 rounded-full bg-gray-200">
+                            <div
+                              className={`h-1 rounded-full transition-all duration-300 ${
+                                getContentQualityScore(editableScript).score >=
+                                80
+                                  ? "bg-green-500"
+                                  : getContentQualityScore(editableScript)
+                                        .score >= 60
+                                    ? "bg-yellow-500"
+                                    : getContentQualityScore(editableScript)
+                                          .score >= 40
+                                      ? "bg-orange-500"
+                                      : "bg-red-500"
+                              }`}
+                              style={{
+                                width: `${getContentQualityScore(editableScript).score}%`,
+                              }}
+                            ></div>
+                          </div>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <div className="h-2 w-2 animate-pulse rounded-full bg-green-500"></div>
+                        <span>Salvando automaticamente</span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -696,34 +849,104 @@ export default function CreateVSL() {
                   />
                 </div>
 
-                {/* VSL Stats */}
+                {/* VSL Stats - Real-time */}
                 <div className="border-t bg-gray-50 px-6 py-4">
-                  <div className="grid grid-cols-4 gap-4 text-center">
+                  <div className="grid grid-cols-2 gap-4 text-center md:grid-cols-4">
                     <div>
                       <div className="text-sm font-medium text-gray-900">
-                        {editableScript.split(" ").length}
+                        {calculateWordCount(editableScript)}
                       </div>
                       <div className="text-xs text-gray-600">Palavras</div>
                     </div>
                     <div>
                       <div className="text-sm font-medium text-gray-900">
-                        {vslResult.tempoEstimado.total}
+                        {estimateVideoLength(editableScript)}
                       </div>
-                      <div className="text-xs text-gray-600">Duração</div>
+                      <div className="text-xs text-gray-600">Duração Est.</div>
                     </div>
                     <div>
                       <div className="text-sm font-medium text-gray-900">
-                        {vslResult.slides.length}
+                        {countParagraphs(editableScript)}
                       </div>
-                      <div className="text-xs text-gray-600">Slides</div>
+                      <div className="text-xs text-gray-600">Parágrafos</div>
                     </div>
                     <div>
                       <div className="text-sm font-medium text-gray-900">
-                        {vslResult.ctasPositions.length}
+                        {countCTAs(editableScript)}
                       </div>
                       <div className="text-xs text-gray-600">CTAs</div>
                     </div>
                   </div>
+
+                  {/* Additional stats row */}
+                  <div className="mt-3 border-t border-gray-200 pt-3">
+                    <div className="grid grid-cols-3 gap-4 text-center">
+                      <div>
+                        <div className="text-xs font-medium text-gray-700">
+                          {calculateCharacterCount(editableScript)}
+                        </div>
+                        <div className="text-xs text-gray-500">Caracteres</div>
+                      </div>
+                      <div>
+                        <div className="text-xs font-medium text-gray-700">
+                          {calculateReadingTime(editableScript)}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          Tempo Leitura
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs font-medium text-gray-700">
+                          {editableScript.split("\n").length}
+                        </div>
+                        <div className="text-xs text-gray-500">Linhas</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Content Quality Score */}
+                  {editableScript.trim() && (
+                    <div className="mt-3 border-t border-gray-200 pt-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium text-gray-700">
+                            Qualidade do Conteúdo:
+                          </span>
+                          <span
+                            className={`text-xs font-bold ${getScoreColor(getContentQualityScore(editableScript).score)}`}
+                          >
+                            {getContentQualityScore(editableScript).score}/100
+                          </span>
+                        </div>
+                        <div className="mx-3 flex-1">
+                          <div className="h-1.5 w-full rounded-full bg-gray-200">
+                            <div
+                              className={`h-1.5 rounded-full transition-all duration-500 ${
+                                getContentQualityScore(editableScript).score >=
+                                80
+                                  ? "bg-green-500"
+                                  : getContentQualityScore(editableScript)
+                                        .score >= 60
+                                    ? "bg-yellow-500"
+                                    : getContentQualityScore(editableScript)
+                                          .score >= 40
+                                      ? "bg-orange-500"
+                                      : "bg-red-500"
+                              }`}
+                              style={{
+                                width: `${getContentQualityScore(editableScript).score}%`,
+                              }}
+                            ></div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-1 text-center">
+                        <span className="text-xs text-gray-600">
+                          {getContentQualityScore(editableScript).feedback}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

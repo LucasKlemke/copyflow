@@ -92,10 +92,10 @@ export function ExpandableSidebar() {
   const secondaryItems: MenuItemType[] = [
     {
       icon: Folder,
-      label: "Projeto",
+      label: "Projetos",
       count: null,
-      route: "/onboarding",
-      id: "projeto",
+      route: "/projetos",
+      id: "projetos",
     },
     {
       icon: BarChart3,

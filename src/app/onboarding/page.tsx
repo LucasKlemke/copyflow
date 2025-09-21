@@ -81,6 +81,7 @@ export default function OnboardingPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<OnboardingData>({
     nomeProduto: "",
     modeloNegocio: "",
@@ -823,6 +824,18 @@ export default function OnboardingPage() {
             Vamos conhecer melhor seu negócio para criar conteúdos mais
             assertivos
           </p>
+
+          {/* Navigation */}
+          <div className="mt-4 flex justify-center">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push("/projetos")}
+              className="flex items-center gap-2"
+            >
+              Ver Todos os Projetos
+            </Button>
+          </div>
         </div>
 
         {/* Progress Bar */}
