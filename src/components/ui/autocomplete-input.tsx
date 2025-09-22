@@ -20,7 +20,7 @@ export function AutocompleteInput({
   value,
   onChange,
   enableAutocomplete = true,
-  minCharsForSuggestion = 3,
+  minCharsForSuggestion = 2,
   className,
   ...props
 }: AutocompleteInputProps) {
@@ -36,8 +36,32 @@ export function AutocompleteInput({
   } = useAutocomplete({
     enabled: enableAutocomplete,
     minChars: minCharsForSuggestion,
-    debounceMs: 300,
+    realTime: true,
   });
+
+  // Clean and prepare suggestion text for display
+  const getCleanSuggestion = (suggestionText: string): string => {
+    if (!suggestionText) return "";
+
+    let clean = suggestionText.trim();
+
+    // Remove common AI response patterns
+    const patterns = [/^[""'"]\s*/, /\s*[""'"]$/, /^\s*[-–—]\s*/, /^\s*\.\s*/];
+
+    patterns.forEach(pattern => {
+      clean = clean.replace(pattern, "");
+    });
+
+    // If suggestion starts with part of what we already have, remove the duplicate
+    const words = value.toLowerCase().split(/\s+/);
+    const lastWord = words[words.length - 1];
+
+    if (lastWord && clean.toLowerCase().startsWith(lastWord)) {
+      clean = clean.slice(lastWord.length);
+    }
+
+    return clean;
+  };
 
   // Track cursor position
   const handleSelectionChange = () => {
@@ -114,35 +138,34 @@ export function AutocompleteInput({
         {...props}
       />
 
-      {/* Autocomplete Suggestion Indicator */}
-      {showSuggestion && (suggestion.isLoading || suggestion.text) && (
-        <div className="absolute top-1/2 right-2 z-10 -translate-y-1/2">
-          {suggestion.isLoading ? (
-            <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-          ) : suggestion.text ? (
-            <div className="flex items-center gap-1">
-              <Lightbulb className="h-3 w-3 text-yellow-500" />
-              <span className="text-xs text-gray-500">Tab ↹</span>
-            </div>
-          ) : null}
+      {/* Ghost Text Overlay for Input */}
+      {showSuggestion && suggestion.text && !suggestion.isLoading && (
+        <div className="pointer-events-none absolute top-0 left-0 flex h-full items-center">
+          <div
+            className="text-gray-400"
+            style={{
+              paddingLeft: `${value.length * 0.6}ch + 12px`, // Approximate character width + padding
+              fontSize: "inherit",
+              fontFamily: "inherit",
+            }}
+          >
+            {getCleanSuggestion(suggestion.text)}
+          </div>
         </div>
       )}
 
-      {/* Floating suggestion preview for inputs */}
+      {/* Loading indicator */}
+      {showSuggestion && suggestion.isLoading && (
+        <div className="absolute top-1/2 right-2 z-10 -translate-y-1/2">
+          <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+        </div>
+      )}
+
+      {/* Tab hint */}
       {showSuggestion && suggestion.text && !suggestion.isLoading && (
-        <div className="absolute top-full right-0 left-0 z-20 mt-1">
-          <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm shadow-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Lightbulb className="h-4 w-4 text-blue-600" />
-                <span className="truncate text-blue-800">
-                  <strong>Sugestão:</strong> {suggestion.text}
-                </span>
-              </div>
-              <div className="ml-2 text-xs whitespace-nowrap text-blue-600">
-                Tab ou → para aceitar
-              </div>
-            </div>
+        <div className="absolute top-1/2 right-2 z-10 -translate-y-1/2">
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-gray-500">Tab ↹</span>
           </div>
         </div>
       )}

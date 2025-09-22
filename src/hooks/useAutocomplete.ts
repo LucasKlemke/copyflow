@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 interface UseAutocompleteOptions {
   minChars?: number;
-  debounceMs?: number;
   enabled?: boolean;
+  realTime?: boolean;
 }
 
 interface AutocompleteSuggestion {
@@ -12,7 +12,7 @@ interface AutocompleteSuggestion {
 }
 
 export function useAutocomplete(options: UseAutocompleteOptions = {}) {
-  const { minChars = 3, debounceMs = 300, enabled = true } = options;
+  const { minChars = 2, enabled = true, realTime = true } = options;
 
   const [suggestion, setSuggestion] = useState<AutocompleteSuggestion>({
     text: "",
@@ -22,6 +22,7 @@ export function useAutocomplete(options: UseAutocompleteOptions = {}) {
 
   const debounceRef = useRef<NodeJS.Timeout>();
   const lastPromptRef = useRef<string>("");
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const fetchSuggestion = useCallback(
     async (prompt: string) => {
@@ -31,10 +32,18 @@ export function useAutocomplete(options: UseAutocompleteOptions = {}) {
         return;
       }
 
+      // Cancel previous request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+
       // Don't fetch if we already have a suggestion for this prompt
       if (lastPromptRef.current === prompt) {
         return;
       }
+
+      // Create new abort controller for this request
+      abortControllerRef.current = new AbortController();
 
       setSuggestion({ text: "", isLoading: true });
       setShowSuggestion(true);
@@ -47,6 +56,7 @@ export function useAutocomplete(options: UseAutocompleteOptions = {}) {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ prompt }),
+          signal: abortControllerRef.current.signal,
         });
 
         if (!response.ok) {
@@ -56,9 +66,11 @@ export function useAutocomplete(options: UseAutocompleteOptions = {}) {
         const data = await response.json();
         setSuggestion({ text: data.suggestion || "", isLoading: false });
       } catch (error) {
-        console.error("Autocomplete error:", error);
-        setSuggestion({ text: "", isLoading: false });
-        setShowSuggestion(false);
+        if (error.name !== "AbortError") {
+          console.error("Autocomplete error:", error);
+          setSuggestion({ text: "", isLoading: false });
+          setShowSuggestion(false);
+        }
       }
     },
     [enabled, minChars]
@@ -66,32 +78,59 @@ export function useAutocomplete(options: UseAutocompleteOptions = {}) {
 
   const getSuggestion = useCallback(
     (text: string, cursorPosition: number) => {
-      // Clear any existing timeout
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current);
-      }
-
       // Get the text up to the cursor position
       const textBeforeCursor = text.slice(0, cursorPosition);
 
-      // Extract the last word or phrase for suggestion
+      // Check if we have enough context to make suggestions
+      // We should suggest if:
+      // 1. We have at least minChars characters overall, OR
+      // 2. We have a recent word that's being typed, OR
+      // 3. We just finished a word (ended with space) and can suggest next word
+
+      const trimmedText = textBeforeCursor.trim();
       const words = textBeforeCursor.split(/\s+/);
       const lastWord = words[words.length - 1];
+      const endsWithSpace = textBeforeCursor.endsWith(" ");
 
-      // If we're in the middle of typing a word, use a broader context
-      const contextLength = Math.min(30, textBeforeCursor.length);
+      // Calculate context for suggestion
+      const contextLength = Math.min(80, textBeforeCursor.length);
       const context = textBeforeCursor.slice(-contextLength);
 
-      debounceRef.current = setTimeout(() => {
-        if (lastWord && lastWord.length >= minChars) {
+      // Determine if we should show suggestions
+      const shouldSuggest =
+        trimmedText.length >= minChars &&
+        // Currently typing a word
+        ((lastWord && lastWord.length >= 1) ||
+          // Just finished a word and context is meaningful
+          (endsWithSpace && trimmedText.length >= 5) ||
+          // Has substantial context
+          trimmedText.length >= 10);
+
+      if (realTime) {
+        // Real-time suggestions without debounce
+        if (shouldSuggest) {
           fetchSuggestion(context);
         } else {
           setSuggestion({ text: "", isLoading: false });
           setShowSuggestion(false);
         }
-      }, debounceMs);
+      } else {
+        // Clear any existing timeout for debounced mode
+        if (debounceRef.current) {
+          clearTimeout(debounceRef.current);
+        }
+
+        debounceRef.current = setTimeout(() => {
+          if (shouldSuggest) {
+            fetchSuggestion(context);
+          } else {
+            setSuggestion({ text: "", isLoading: false });
+            setShowSuggestion(false);
+          }
+        }, 300);
+      }
     },
-    [fetchSuggestion, debounceMs, minChars]
+    [fetchSuggestion, minChars, realTime]
   );
 
   const acceptSuggestion = useCallback(
@@ -101,17 +140,31 @@ export function useAutocomplete(options: UseAutocompleteOptions = {}) {
       const textBeforeCursor = currentText.slice(0, cursorPosition);
       const textAfterCursor = currentText.slice(cursorPosition);
 
-      // Find the last incomplete word
-      const words = textBeforeCursor.split(/\s+/);
+      // Clean up the suggestion text (remove any unwanted prefixes)
+      let cleanSuggestion = suggestion.text.trim();
+
+      // Remove common AI response patterns that might repeat the input
+      const patterns = [
+        /^[""'"]\s*/, // Remove quotes at start
+        /\s*[""'"]$/, // Remove quotes at end
+        /^\s*[-–—]\s*/, // Remove dashes
+        /^\s*\.\s*/, // Remove dots
+      ];
+
+      patterns.forEach(pattern => {
+        cleanSuggestion = cleanSuggestion.replace(pattern, "");
+      });
+
+      // If suggestion starts with part of what we already have, remove the duplicate
+      const words = textBeforeCursor.toLowerCase().split(/\s+/);
       const lastWord = words[words.length - 1];
 
-      // Replace the last word with the suggestion
-      const beforeLastWord = words.slice(0, -1).join(" ");
-      const newText =
-        beforeLastWord +
-        (beforeLastWord ? " " : "") +
-        suggestion.text +
-        textAfterCursor;
+      if (lastWord && cleanSuggestion.toLowerCase().startsWith(lastWord)) {
+        cleanSuggestion = cleanSuggestion.slice(lastWord.length);
+      }
+
+      // Simply append the suggestion at the cursor position
+      const newText = textBeforeCursor + cleanSuggestion + textAfterCursor;
 
       setSuggestion({ text: "", isLoading: false });
       setShowSuggestion(false);
@@ -130,6 +183,10 @@ export function useAutocomplete(options: UseAutocompleteOptions = {}) {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
     }
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
   }, []);
 
   // Cleanup on unmount
@@ -137,6 +194,9 @@ export function useAutocomplete(options: UseAutocompleteOptions = {}) {
     return () => {
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
       }
     };
   }, []);

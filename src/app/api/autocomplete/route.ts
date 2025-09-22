@@ -10,8 +10,20 @@ export async function POST(req: NextRequest) {
   try {
     const { text } = await generateText({
       model: openai("gpt-4o-mini"), // Or your chosen model
-      prompt: `You are an intelligent autocomplete engine. Given a partial word or phrase, return a smart suggestion that completes it meaningfully. Suggest a single, concise completion for: "${prompt}"`,
-      maxTokens: 20, // Limit the length of the suggestion
+      prompt: `You are an intelligent autocomplete engine for Portuguese text. Your job is to CONTINUE the text from where it ends, not replace it.
+
+Given this partial text: "${prompt}"
+
+Rules:
+1. Only provide the CONTINUATION from where the text ends
+2. Do NOT repeat any part of the input text
+3. Continue naturally in Portuguese
+4. Keep it concise (1-5 words maximum)
+5. If the text ends mid-word, complete just that word
+6. If the text ends with a complete word, suggest the next logical words
+
+Continue from here:`,
+      maxTokens: 15, // Reduced for shorter continuations
     });
 
     return NextResponse.json({ suggestion: text });
