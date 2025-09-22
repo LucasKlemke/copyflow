@@ -27,7 +27,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { VSLLoading } from "@/components/ui/vsl-loading";
-import type { ChatMessage, Project, VSLFormData, VSLResult } from "@/types";
+import type {
+  ChatMessage,
+  Creative,
+  Project,
+  VSLFormData,
+  VSLResult,
+} from "@/types/project";
 
 // Types are now imported from @/types
 
@@ -139,7 +145,7 @@ export default function CreateVSL() {
     elementos: [],
   });
 
-  const totalSteps = 6; // 5 steps + 1 review step
+  const totalSteps = 7; // 1 title + 5 config steps + 1 review step
 
   useEffect(() => {
     // Check authentication and project
@@ -162,6 +168,9 @@ export default function CreateVSL() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [vslResult, setVslResult] = useState<VSLResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [currentVSL, setCurrentVSL] = useState<Creative | null>(null);
+  const [vslTitle, setVslTitle] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   // Editor state
   const [editableScript, setEditableScript] = useState("");
@@ -291,18 +300,117 @@ export default function CreateVSL() {
     }));
   };
 
+  const saveVSL = async (autoSave = false) => {
+    if (!project || (!vslTitle.trim() && !autoSave)) {
+      if (!autoSave) {
+        setError("Por favor, insira um título para a VSL");
+      }
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const vslData = {
+        title: vslTitle || `VSL ${new Date().toLocaleDateString()}`,
+        content: editableScript,
+        type: "VSL" as const,
+        projectId: project.id,
+        status: vslResult ? "DRAFT" : ("DRAFT" as const),
+        vslParameters: formData,
+        chatHistory: chatMessages,
+      };
+
+      let response;
+      if (currentVSL) {
+        // Update existing VSL
+        response = await fetch(`/api/creatives/${currentVSL.id}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(vslData),
+        });
+      } else {
+        // Create new VSL
+        response = await fetch("/api/creatives", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(vslData),
+        });
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erro ao salvar VSL");
+      }
+
+      const savedVSL = await response.json();
+      setCurrentVSL(savedVSL);
+
+      if (!autoSave) {
+        // Show success message or redirect
+        console.log("VSL salva com sucesso!");
+      }
+    } catch (err) {
+      if (!autoSave) {
+        setError(err instanceof Error ? err.message : "Erro ao salvar VSL");
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleSubmit = async () => {
     setIsGenerating(true);
     setError(null);
 
     try {
+      // Prepare request data with project information
+      const requestData = {
+        ...formData,
+        projectId: project?.id,
+        projectData: project
+          ? {
+              nicho: project.nicho || "",
+              modeloNegocio: project.modeloNegocio || "",
+              publicoIdeal: project.publicoIdeal || "",
+              faixaPreco: project.faixaPreco || "",
+              promessaPrincipal: project.promessaPrincipal || "",
+              diferencialCompetitivo:
+                typeof project.diferencialCompetitivo === "string"
+                  ? JSON.parse(project.diferencialCompetitivo)
+                  : project.diferencialCompetitivo || [],
+              nivelMarketingDigital: project.nivelMarketingDigital || "",
+              nivelCopywriting: project.nivelCopywriting || "",
+              faturamentoAtual: project.faturamentoAtual || "",
+              principalDesafio: project.principalDesafio || "",
+            }
+          : undefined,
+      };
+
+      // Log data being sent for debugging
+      console.log("🚀 Sending VSL Generation Request:");
+      console.log("- Title:", vslTitle);
+      console.log("- Project:", project?.name);
+      console.log("- Form Data:", formData);
+      console.log("- Project Data Available:", !!requestData.projectData);
+      if (requestData.projectData) {
+        console.log("- Project Context:", {
+          nicho: requestData.projectData.nicho,
+          modeloNegocio: requestData.projectData.modeloNegocio,
+          publicoIdeal: requestData.projectData.publicoIdeal,
+        });
+      }
+
       // Start the actual API call
       const response = await fetch("/api/generate-vsl", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(requestData),
       });
 
       // Signal that API call is complete
@@ -320,6 +428,11 @@ export default function CreateVSL() {
 
       setVslResult(result.data);
       setEditableScript(result.data.script);
+
+      // Auto-save after generation if we have a title
+      if (vslTitle.trim()) {
+        await saveVSL(true);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro desconhecido");
     } finally {
@@ -427,24 +540,39 @@ export default function CreateVSL() {
       setChatMessages(prev => [...prev, aiMessage]);
       if (scriptImprovement) {
         setEditableScript(scriptImprovement);
+        // Auto-save after script improvement
+        setTimeout(() => saveVSL(true), 2000);
       }
     }, 1500);
   };
+
+  // Auto-save functionality
+  useEffect(() => {
+    if (editableScript && currentVSL && vslTitle) {
+      const timeoutId = setTimeout(() => {
+        saveVSL(true);
+      }, 3000); // Auto-save after 3 seconds of inactivity
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [editableScript, chatMessages]);
 
   // Validation functions for each step
   const isStepValid = (step: number): boolean => {
     switch (step) {
       case 1:
-        return !!formData.tipo;
+        return !!vslTitle.trim();
       case 2:
-        return !!formData.duracao;
+        return !!formData.tipo;
       case 3:
-        return !!formData.abordagem;
+        return !!formData.duracao;
       case 4:
-        return !!formData.cta;
+        return !!formData.abordagem;
       case 5:
-        return true; // elementos are optional
+        return !!formData.cta;
       case 6:
+        return true; // elementos are optional
+      case 7:
         return true; // review step
       default:
         return false;
@@ -452,7 +580,11 @@ export default function CreateVSL() {
   };
 
   const isFormValid =
-    formData.tipo && formData.duracao && formData.abordagem && formData.cta;
+    vslTitle.trim() &&
+    formData.tipo &&
+    formData.duracao &&
+    formData.abordagem &&
+    formData.cta;
 
   // Navigation functions
   const nextStep = () => {
@@ -492,10 +624,20 @@ export default function CreateVSL() {
           <div className="flex-1">
             <h1 className="text-2xl font-medium text-gray-900">Criar VSL</h1>
             <p className="text-sm text-gray-600">
-              {currentStep === 6
-                ? "Revise suas configurações antes de gerar a VSL"
-                : "Configure os parâmetros para gerar seu script de VSL personalizado"}
+              {currentStep === 1
+                ? "Primeiro, dê um nome único para sua VSL"
+                : currentStep === 7
+                  ? "Revise suas configurações antes de gerar a VSL"
+                  : "Configure os parâmetros para gerar seu script de VSL personalizado"}
             </p>
+            {project && (
+              <div className="mt-2 flex items-center gap-2 text-xs text-blue-600">
+                <div className="h-1.5 w-1.5 rounded-full bg-blue-600"></div>
+                <span>
+                  Usando dados do projeto "{project.name}" para personalização
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -538,6 +680,7 @@ export default function CreateVSL() {
           {/* Step Labels */}
           <div className="mt-2 flex justify-between">
             {[
+              "Título",
               "Tipo",
               "Duração",
               "Abordagem",
@@ -561,8 +704,84 @@ export default function CreateVSL() {
         </div>
 
         <div className="space-y-8">
-          {/* Step 1: Tipo de VSL */}
+          {/* Step 1: Título da VSL */}
           {currentStep === 1 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Título da VSL</CardTitle>
+                <p className="text-sm text-gray-600">
+                  Escolha um nome único e descritivo para sua VSL
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-900">
+                      Nome da VSL
+                    </label>
+                    <Input
+                      value={vslTitle}
+                      onChange={e => setVslTitle(e.target.value)}
+                      placeholder="Ex: VSL Produto Revolucionário - Vendas 2024"
+                      className="w-full"
+                    />
+                    <p className="text-xs text-gray-600">
+                      Este será o nome da sua VSL no dashboard e sistema
+                    </p>
+                  </div>
+
+                  {project && (
+                    <div className="rounded-lg bg-blue-50 p-4">
+                      <h4 className="mb-2 font-medium text-blue-900">
+                        📊 Projeto Selecionado
+                      </h4>
+                      <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
+                        <div>
+                          <span className="font-medium text-blue-800">
+                            Nome:
+                          </span>
+                          <span className="ml-2 text-blue-700">
+                            {project.name}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-blue-800">
+                            Nicho:
+                          </span>
+                          <span className="ml-2 text-blue-700">
+                            {project.nicho || "N/A"}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-blue-800">
+                            Público:
+                          </span>
+                          <span className="ml-2 text-blue-700">
+                            {project.publicoIdeal || "N/A"}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-blue-800">
+                            Modelo:
+                          </span>
+                          <span className="ml-2 text-blue-700">
+                            {project.modeloNegocio || "N/A"}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="mt-2 text-xs text-blue-600">
+                        ✨ Estas informações serão usadas para personalizar sua
+                        VSL
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Step 2: Tipo de VSL */}
+          {currentStep === 2 && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Tipo de VSL</CardTitle>
@@ -604,8 +823,8 @@ export default function CreateVSL() {
             </Card>
           )}
 
-          {/* Step 2: Duração Desejada */}
-          {currentStep === 2 && (
+          {/* Step 3: Duração Desejada */}
+          {currentStep === 3 && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Duração Desejada</CardTitle>
@@ -642,8 +861,8 @@ export default function CreateVSL() {
             </Card>
           )}
 
-          {/* Step 3: Abordagem Principal */}
-          {currentStep === 3 && (
+          {/* Step 4: Abordagem Principal */}
+          {currentStep === 4 && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Abordagem Principal</CardTitle>
@@ -691,8 +910,8 @@ export default function CreateVSL() {
             </Card>
           )}
 
-          {/* Step 4: Call-to-Action Final */}
-          {currentStep === 4 && (
+          {/* Step 5: Call-to-Action Final */}
+          {currentStep === 5 && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Call-to-Action Final</CardTitle>
@@ -729,8 +948,8 @@ export default function CreateVSL() {
             </Card>
           )}
 
-          {/* Step 5: Elementos Extras */}
-          {currentStep === 5 && (
+          {/* Step 6: Elementos Extras */}
+          {currentStep === 6 && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">
@@ -777,8 +996,8 @@ export default function CreateVSL() {
             </Card>
           )}
 
-          {/* Step 6: Revisão */}
-          {currentStep === 6 && (
+          {/* Step 7: Revisão */}
+          {currentStep === 7 && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">
@@ -789,6 +1008,75 @@ export default function CreateVSL() {
                 </p>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* Title */}
+                <div className="flex items-center justify-between border-b pb-4">
+                  <div>
+                    <h4 className="font-medium text-gray-900">Título da VSL</h4>
+                    <p className="text-sm text-gray-600">
+                      {vslTitle || "Sem título definido"}
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => goToStep(1)}
+                  >
+                    <Edit3 className="mr-2 h-4 w-4" />
+                    Editar
+                  </Button>
+                </div>
+
+                {/* Project Context - only show if project data exists */}
+                {project && (
+                  <div className="mb-6 rounded-lg bg-blue-50 p-4">
+                    <h4 className="mb-3 font-medium text-blue-900">
+                      📊 Contexto do Projeto (será considerado na geração)
+                    </h4>
+                    <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
+                      <div>
+                        <span className="font-medium text-blue-800">
+                          Nicho:
+                        </span>
+                        <span className="ml-2 text-blue-700">
+                          {project.nicho || "N/A"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="font-medium text-blue-800">
+                          Modelo:
+                        </span>
+                        <span className="ml-2 text-blue-700">
+                          {project.modeloNegocio || "N/A"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="font-medium text-blue-800">
+                          Público:
+                        </span>
+                        <span className="ml-2 text-blue-700">
+                          {project.publicoIdeal || "N/A"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="font-medium text-blue-800">
+                          Faixa de Preço:
+                        </span>
+                        <span className="ml-2 text-blue-700">
+                          {project.faixaPreco || "N/A"}
+                        </span>
+                      </div>
+                      <div className="md:col-span-2">
+                        <span className="font-medium text-blue-800">
+                          Promessa:
+                        </span>
+                        <span className="ml-2 text-blue-700">
+                          {project.promessaPrincipal || "N/A"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Tipo */}
                 <div className="flex items-center justify-between border-b pb-4">
                   <div>
@@ -819,7 +1107,7 @@ export default function CreateVSL() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => goToStep(2)}
+                    onClick={() => goToStep(3)}
                   >
                     <Edit3 className="mr-2 h-4 w-4" />
                     Editar
@@ -846,7 +1134,7 @@ export default function CreateVSL() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => goToStep(3)}
+                    onClick={() => goToStep(4)}
                   >
                     <Edit3 className="mr-2 h-4 w-4" />
                     Editar
@@ -866,7 +1154,7 @@ export default function CreateVSL() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => goToStep(4)}
+                    onClick={() => goToStep(5)}
                   >
                     <Edit3 className="mr-2 h-4 w-4" />
                     Editar
@@ -890,7 +1178,7 @@ export default function CreateVSL() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => goToStep(5)}
+                    onClick={() => goToStep(6)}
                   >
                     <Edit3 className="mr-2 h-4 w-4" />
                     Editar
@@ -951,8 +1239,20 @@ export default function CreateVSL() {
                       <Download className="mr-2 h-4 w-4" />
                       Exportar
                     </Button>
-                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
-                      Salvar VSL
+                    <Button
+                      size="sm"
+                      className="bg-blue-600 hover:bg-blue-700"
+                      onClick={() => saveVSL()}
+                      disabled={isSaving || !vslTitle.trim()}
+                    >
+                      {isSaving ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Salvando...
+                        </>
+                      ) : (
+                        "Salvar VSL"
+                      )}
                     </Button>
                   </div>
                 </div>
@@ -1099,8 +1399,22 @@ export default function CreateVSL() {
                           </div>
                         )}
                         <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <div className="h-2 w-2 animate-pulse rounded-full bg-green-500"></div>
-                          <span>Salvando automaticamente</span>
+                          <div
+                            className={`h-2 w-2 rounded-full ${
+                              isSaving
+                                ? "animate-pulse bg-yellow-500"
+                                : currentVSL
+                                  ? "bg-green-500"
+                                  : "bg-gray-400"
+                            }`}
+                          ></div>
+                          <span>
+                            {isSaving
+                              ? "Salvando..."
+                              : currentVSL
+                                ? "Salvo automaticamente"
+                                : "Não salvo"}
+                          </span>
                         </div>
                       </div>
                     </div>

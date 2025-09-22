@@ -11,9 +11,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login } = useAuth();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -27,21 +29,11 @@ export default function LoginPage() {
     setError("");
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // For now, just store user info in localStorage
-      localStorage.setItem(
-        "user",
-        JSON.stringify({
-          email: formData.email,
-          name: formData.email.split("@")[0],
-        })
-      );
-
+      // Login via auth hook
+      await login(formData.email, formData.password);
       router.push("/dashboard");
-    } catch (err) {
-      setError("Erro ao fazer login. Verifique suas credenciais.");
+    } catch (err: any) {
+      setError(err.message || "Erro ao fazer login. Tente novamente.");
     } finally {
       setIsLoading(false);
     }

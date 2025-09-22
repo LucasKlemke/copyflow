@@ -49,41 +49,38 @@ export function Header() {
     const projectData = localStorage.getItem("currentProject");
 
     if (userData) {
-      setUser(JSON.parse(userData));
+      const user = JSON.parse(userData);
+      setUser(user);
+      // Load available projects from API
+      loadProjects(user.id);
     }
 
     if (projectData) {
       setProject(JSON.parse(projectData));
     }
-
-    // Load available projects (mock data for now)
-    const mockProjects: ProjectData[] = [
-      {
-        id: "1",
-        name: "Curso de Inglês Online",
-        createdAt: "2024-01-15",
-        status: "ativo",
-        modeloNegocio: "infoprodutos",
-      },
-      {
-        id: "2",
-        name: "E-commerce de Roupas",
-        createdAt: "2024-01-10",
-        status: "ativo",
-        modeloNegocio: "ecommerce",
-      },
-      {
-        id: "3",
-        name: "Consultoria Empresarial",
-        createdAt: "2024-01-05",
-        status: "pausado",
-        modeloNegocio: "servicos",
-      },
-    ];
-    setAvailableProjects(mockProjects);
   }, []);
 
-  const handleProjectChange = (projectId: string) => {
+  const loadProjects = async (userId: string) => {
+    try {
+      const response = await fetch("/api/projects");
+      if (response.ok) {
+        const projects = await response.json();
+        // Map to header format
+        const mappedProjects = projects.map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          createdAt: p.createdAt,
+          status: p.status === "ATIVO" ? "ativo" : "pausado",
+          modeloNegocio: p.modeloNegocio,
+        }));
+        setAvailableProjects(mappedProjects);
+      }
+    } catch (error) {
+      console.error("Error loading projects:", error);
+    }
+  };
+
+  const handleProjectChange = async (projectId: string) => {
     if (projectId === "manage") {
       router.push("/projetos");
       return;
@@ -94,11 +91,35 @@ export function Header() {
       return;
     }
 
-    const selectedProject = availableProjects.find(p => p.id === projectId);
-    if (selectedProject) {
-      localStorage.setItem("currentProject", JSON.stringify(selectedProject));
-      setProject(selectedProject);
-      router.push("/dashboard");
+    // Load complete project data from API
+    try {
+      const response = await fetch(`/api/projects/${projectId}`);
+      if (response.ok) {
+        const fullProjectData = await response.json();
+
+        // Store complete project data
+        localStorage.setItem("currentProject", JSON.stringify(fullProjectData));
+
+        // Update header state with mapped data
+        const headerProject = {
+          id: fullProjectData.id,
+          name: fullProjectData.name,
+          createdAt: fullProjectData.createdAt,
+          status: fullProjectData.status === "ATIVO" ? "ativo" : "pausado",
+          modeloNegocio: fullProjectData.modeloNegocio,
+        };
+        setProject(headerProject);
+        router.push("/dashboard");
+      }
+    } catch (error) {
+      console.error("Error loading project:", error);
+      // Fallback to basic project data
+      const selectedProject = availableProjects.find(p => p.id === projectId);
+      if (selectedProject) {
+        localStorage.setItem("currentProject", JSON.stringify(selectedProject));
+        setProject(selectedProject);
+        router.push("/dashboard");
+      }
     }
   };
 

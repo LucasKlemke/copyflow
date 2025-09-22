@@ -17,6 +17,8 @@ import {
   Users,
 } from "lucide-react";
 
+import type { Creative } from "@/types/project";
+
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Separator } from "./ui/separator";
@@ -38,7 +40,8 @@ interface Project {
 export function ExpandableSidebar() {
   const [isExpanded, setIsExpanded] = useState(false);
   const [project, setProject] = useState<Project | null>(null);
-  const [criativos, setCriativos] = useState<any[]>([]);
+  const [criativos, setCriativos] = useState<Creative[]>([]);
+  const [isLoadingCreatives, setIsLoadingCreatives] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -46,17 +49,26 @@ export function ExpandableSidebar() {
     // Load project and criativos data
     const currentProject = localStorage.getItem("currentProject");
     if (currentProject) {
-      setProject(JSON.parse(currentProject));
+      const projectData = JSON.parse(currentProject);
+      setProject(projectData);
+      loadCreatives(projectData.id);
     }
-
-    // Mock criativos data (in real app, this would come from API)
-    const mockCriativos = [
-      { id: "1", status: "concluido" },
-      { id: "2", status: "em-revisao" },
-      { id: "3", status: "rascunho" },
-    ];
-    setCriativos(mockCriativos);
   }, []);
+
+  const loadCreatives = async (projectId: string) => {
+    setIsLoadingCreatives(true);
+    try {
+      const response = await fetch(`/api/creatives?projectId=${projectId}`);
+      if (response.ok) {
+        const creativesData = await response.json();
+        setCriativos(creativesData);
+      }
+    } catch (error) {
+      console.error("Error loading creatives:", error);
+    } finally {
+      setIsLoadingCreatives(false);
+    }
+  };
 
   const menuItems: MenuItemType[] = [
     {
@@ -76,7 +88,7 @@ export function ExpandableSidebar() {
     {
       icon: Star,
       label: "Favoritos",
-      count: criativos.filter(c => c.status === "concluido").length,
+      count: criativos.filter(c => c.status === "PUBLISHED").length,
       route: "/dashboard?filter=favoritos",
       id: "favoritos",
     },
@@ -107,7 +119,7 @@ export function ExpandableSidebar() {
     {
       icon: Trash2,
       label: "Lixeira",
-      count: criativos.filter(c => c.status === "rascunho").length,
+      count: criativos.filter(c => c.status === "DRAFT").length,
       route: "/dashboard?filter=rascunhos",
       id: "lixeira",
     },

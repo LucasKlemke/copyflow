@@ -1,0 +1,92 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  projects Project[]
+
+  @@map("users")
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Project details from form
+  nicho                  String
+  modeloNegocio          String
+  publicoIdeal           String
+  faixaPreco             String
+  promessaPrincipal      String
+  diferencialCompetitivo String // JSON string array
+  nivelMarketingDigital  String
+  nivelCopywriting       String
+  faturamentoAtual       String
+  principalDesafio       String
+  status                 ProjectStatus @default(ATIVO)
+
+  // Relations
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  creatives Creative[]
+
+  @@map("projects")
+}
+
+model Creative {
+  id        String         @id @default(cuid())
+  title     String
+  content   String?
+  type      CreativeType
+  status    CreativeStatus @default(DRAFT)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  // VSL specific fields
+  vslParameters String? // JSON string with VSL form data
+  chatHistory   String? // JSON string with chat messages
+
+  // Relations
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("creatives")
+}
+
+enum CreativeType {
+  ANUNCIO
+  EMAIL
+  SALES_PAGE
+  VSL
+}
+
+enum CreativeStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ProjectStatus {
+  ATIVO
+  PAUSADO
+  CONCLUIDO
+  ARQUIVADO
+}

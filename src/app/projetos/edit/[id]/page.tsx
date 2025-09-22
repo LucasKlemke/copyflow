@@ -54,94 +54,99 @@ export default function EditProjectPage() {
       return;
     }
 
-    // Load project data (mock data)
-    const mockProjetos: Projeto[] = [
-      {
-        id: "1",
-        name: "Curso de Inglês Online",
-        description: "Curso completo de inglês para iniciantes",
-        createdAt: "2024-01-15",
-        updatedAt: "2024-01-20",
-        criativos: 5,
-        status: "ativo",
-        modeloNegocio: "infoprodutos",
-        metaFaturamento: "10k-50k",
-      },
-      {
-        id: "2",
-        name: "E-commerce de Roupas",
-        description: "Loja virtual de moda feminina",
-        createdAt: "2024-01-10",
-        updatedAt: "2024-01-18",
-        criativos: 3,
-        status: "ativo",
-        modeloNegocio: "ecommerce",
-        metaFaturamento: "50k-100k",
-      },
-      {
-        id: "3",
-        name: "Consultoria Empresarial",
-        description: "Serviços de consultoria para PMEs",
-        createdAt: "2024-01-05",
-        updatedAt: "2024-01-12",
-        criativos: 2,
-        status: "pausado",
-        modeloNegocio: "servicos",
-        metaFaturamento: "100k-300k",
-      },
-    ];
+    // Load project data from API
+    const loadProject = async () => {
+      try {
+        const response = await fetch(`/api/projects/${projectId}`);
+        if (!response.ok) {
+          if (response.status === 404) {
+            router.push("/projetos");
+            return;
+          }
+          throw new Error("Failed to load project");
+        }
 
-    const foundProject = mockProjetos.find(p => p.id === projectId);
-    if (!foundProject) {
-      router.push("/projetos");
-      return;
-    }
+        const projectData = await response.json();
 
-    setProjeto(foundProject);
+        const mappedProject: Projeto = {
+          id: projectData.id,
+          name: projectData.name,
+          description: projectData.description,
+          createdAt: projectData.createdAt,
+          updatedAt: projectData.updatedAt,
+          criativos: projectData._count.creatives,
+          status: projectData.status.toLowerCase() as
+            | "ativo"
+            | "pausado"
+            | "arquivado",
+          modeloNegocio: projectData.modeloNegocio,
+          metaFaturamento: projectData.faturamentoAtual,
+        };
 
-    // Convert project data to form format
-    if (foundProject.onboardingData) {
-      setInitialData(foundProject.onboardingData);
-    } else {
-      // Map basic project data to new form structure
-      setInitialData({
-        nomeProjeto: foundProject.name,
-        modeloNegocio: foundProject.modeloNegocio,
-        faturamentoAtual: foundProject.metaFaturamento,
-        promessaPrincipal: foundProject.description || "",
-        // Set some defaults for missing fields
-        nicho: "educacao", // default based on the example
-        publicoIdeal: "adulto-profissional",
-        faixaPreco: "intermediario",
-        diferencialCompetitivo: ["metodo"],
-        nivelMarketingDigital: "intermediario",
-        nivelCopywriting: "basico",
-        principalDesafio: "trafego",
-      });
-    }
+        setProjeto(mappedProject);
+
+        // Map project data to form format
+        const formData: Partial<ProjetoFormData> = {
+          nomeProjeto: projectData.name,
+          nicho: projectData.nicho,
+          modeloNegocio: projectData.modeloNegocio,
+          publicoIdeal: projectData.publicoIdeal,
+          faixaPreco: projectData.faixaPreco,
+          promessaPrincipal: projectData.promessaPrincipal,
+          diferencialCompetitivo: projectData.diferencialCompetitivo
+            ? JSON.parse(projectData.diferencialCompetitivo)
+            : [],
+          nivelMarketingDigital: projectData.nivelMarketingDigital,
+          nivelCopywriting: projectData.nivelCopywriting,
+          faturamentoAtual: projectData.faturamentoAtual,
+          principalDesafio: projectData.principalDesafio,
+        };
+
+        setInitialData(formData);
+      } catch (error) {
+        console.error("Error loading project:", error);
+        router.push("/projetos");
+      }
+    };
+
+    loadProject();
   }, [projectId, router]);
 
   const handleSubmit = async (data: ProjetoFormData) => {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Update project via API
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
 
-      // Update project
-      const updatedProject = {
-        ...projeto!,
-        name: data.nomeProjeto,
-        description: data.promessaPrincipal,
-        modeloNegocio: data.modeloNegocio,
-        metaFaturamento: data.faturamentoAtual,
-        updatedAt: new Date().toISOString(),
-        onboardingData: data,
-      };
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to update project");
+      }
+
+      const updatedProjectData = await response.json();
 
       // Update current project if it's the one being edited
       const currentProject = localStorage.getItem("currentProject");
       if (currentProject) {
         const current = JSON.parse(currentProject);
         if (current.id === projectId) {
+          const updatedProject = {
+            id: updatedProjectData.id,
+            name: updatedProjectData.name,
+            description: updatedProjectData.description,
+            createdAt: updatedProjectData.createdAt,
+            updatedAt: updatedProjectData.updatedAt,
+            criativos: updatedProjectData._count.creatives,
+            status: "ativo" as const,
+            modeloNegocio: updatedProjectData.modeloNegocio,
+            metaFaturamento: updatedProjectData.faturamentoAtual,
+            onboardingData: data,
+          };
           localStorage.setItem(
             "currentProject",
             JSON.stringify(updatedProject)
@@ -174,8 +179,15 @@ export default function EditProjectPage() {
     setIsDeleting(true);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Delete project via API
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to delete project");
+      }
 
       // Clear current project if it's the one being deleted
       const currentProject = localStorage.getItem("currentProject");
@@ -189,6 +201,7 @@ export default function EditProjectPage() {
       router.push("/projetos");
     } catch (error) {
       console.error("Erro ao excluir projeto:", error);
+      alert("Erro ao excluir projeto. Tente novamente.");
     } finally {
       setIsDeleting(false);
     }

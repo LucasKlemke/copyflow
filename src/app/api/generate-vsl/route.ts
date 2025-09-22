@@ -9,6 +9,20 @@ interface VSLRequest {
   abordagem: string;
   cta: string;
   elementos: string[];
+  // Informações do projeto
+  projectId?: string;
+  projectData?: {
+    nicho: string;
+    modeloNegocio: string;
+    publicoIdeal: string;
+    faixaPreco: string;
+    promessaPrincipal: string;
+    diferencialCompetitivo: string[];
+    nivelMarketingDigital: string;
+    nivelCopywriting: string;
+    faturamentoAtual: string;
+    principalDesafio: string;
+  };
 }
 
 interface VSLResponse {
@@ -54,10 +68,50 @@ async function generateVSLWithAI(formData: VSLRequest): Promise<VSLResponse> {
     telefone: "Telefone",
   };
 
+  // Construir informações do projeto para contextualização
+  let projectContext = "";
+  if (formData.projectData) {
+    const { projectData } = formData;
+
+    // Mapear modelo de negócio
+    const modeloNegocioLabels = {
+      infoproduto: "Infoprodutos/Cursos Online",
+      ecommerce: "E-commerce/Loja Virtual",
+      saas: "SaaS/Software",
+      servicos: "Prestação de Serviços",
+      afiliados: "Marketing de Afiliados",
+      agencia: "Agência de Marketing",
+    };
+
+    // Mapear faixa de preço
+    const faixaPrecoLabels = {
+      "ate-100": "até R$ 100",
+      "100-500": "R$ 100 a R$ 500",
+      "500-1000": "R$ 500 a R$ 1.000",
+      "1000-3000": "R$ 1.000 a R$ 3.000",
+      "3000-plus": "acima de R$ 3.000",
+    };
+
+    projectContext = `
+**CONTEXTO DO PROJETO/NEGÓCIO:**
+- Nicho/Segmento: ${projectData.nicho}
+- Modelo de Negócio: ${modeloNegocioLabels[projectData.modeloNegocio as keyof typeof modeloNegocioLabels] || projectData.modeloNegocio}
+- Público-Alvo: ${projectData.publicoIdeal}
+- Faixa de Preço: ${faixaPrecoLabels[projectData.faixaPreco as keyof typeof faixaPrecoLabels] || projectData.faixaPreco}
+- Promessa Principal: ${projectData.promessaPrincipal}
+- Diferenciais Competitivos: ${Array.isArray(projectData.diferencialCompetitivo) ? projectData.diferencialCompetitivo.join(", ") : projectData.diferencialCompetitivo}
+- Nível Marketing Digital: ${projectData.nivelMarketingDigital}
+- Faturamento Atual: ${projectData.faturamentoAtual}
+- Principal Desafio: ${projectData.principalDesafio}
+
+**IMPORTANTE:** Use essas informações para personalizar completamente a VSL, tornando-a específica para este negócio, nicho e público-alvo.`;
+  }
+
   // Construir prompt dinâmico baseado nas respostas do formulário
   let prompt = `Você é um especialista em criação de VSLs (Video Sales Letters) de alta conversão. 
 
 Crie um script completo e profissional de VSL baseado nas seguintes especificações:
+${projectContext}
 
 **CONFIGURAÇÕES DA VSL:**
 - Tipo: ${tipoLabels[formData.tipo as keyof typeof tipoLabels]}
@@ -103,9 +157,25 @@ Crie um script completo e profissional de VSL baseado nas seguintes especificaç
       break;
   }
 
-  prompt += `
+  // Adicionar instruções específicas baseadas no projeto
+  if (formData.projectData) {
+    prompt += `
+
+3. **PERSONALIZAÇÃO BASEADA NO PROJETO:**
+   - Adapte a linguagem para o nicho "${formData.projectData.nicho}"
+   - Foque nos problemas específicos do público: "${formData.projectData.publicoIdeal}"
+   - Enfatize a promessa principal: "${formData.projectData.promessaPrincipal}"
+   - Destaque os diferenciais: ${Array.isArray(formData.projectData.diferencialCompetitivo) ? formData.projectData.diferencialCompetitivo.join(", ") : formData.projectData.diferencialCompetitivo}
+   - Considere o nível de conhecimento do público (Marketing Digital: ${formData.projectData.nivelMarketingDigital})
+   - Aborde o principal desafio: "${formData.projectData.principalDesafio}"
+   - Justifique o investimento para a faixa de preço: ${formData.projectData.faixaPreco}
+
+4. **ELEMENTOS OBRIGATÓRIOS A INCLUIR:**`;
+  } else {
+    prompt += `
 
 3. **ELEMENTOS OBRIGATÓRIOS A INCLUIR:**`;
+  }
 
   // Adicionar instruções específicas para cada elemento selecionado
   formData.elementos.forEach(elemento => {
@@ -143,9 +213,10 @@ Crie um script completo e profissional de VSL baseado nas seguintes especificaç
     }
   });
 
+  const nextSectionNumber = formData.projectData ? 5 : 4;
   prompt += `
 
-4. **CALL-TO-ACTION ESPECÍFICO:**`;
+${nextSectionNumber}. **CALL-TO-ACTION ESPECÍFICO:**`;
 
   // Adicionar instruções específicas para o CTA escolhido
   switch (formData.cta) {
@@ -175,9 +246,12 @@ Crie um script completo e profissional de VSL baseado nas seguintes especificaç
       break;
   }
 
+  const formatSectionNumber = formData.projectData ? 6 : 5;
+  const timingSectionNumber = formData.projectData ? 7 : 6;
+
   prompt += `
 
-5. **FORMATO DE SAÍDA:**
+${formatSectionNumber}. **FORMATO DE SAÍDA:**
    - Retorne APENAS o script em markdown
    - Use títulos e subtítulos para organizar
    - Inclua marcações de tempo
@@ -186,7 +260,7 @@ Crie um script completo e profissional de VSL baseado nas seguintes especificaç
    - Adapte o tom para o público brasileiro
    - Use "você" para se dirigir ao espectador
 
-6. **DURAÇÃO E TIMING:**
+${timingSectionNumber}. **DURAÇÃO E TIMING:**
    - Respeite a duração total de ${formData.duracao} minutos
    - Distribua o conteúdo proporcionalmente
    - Inclua pausas naturais e transições
@@ -267,6 +341,27 @@ export async function POST(request: NextRequest) {
   try {
     const formData: VSLRequest = await request.json();
 
+    // Log received data for debugging
+    console.log("📊 VSL Generation Request:");
+    console.log("- Project ID:", formData.projectId);
+    console.log("- Has Project Data:", !!formData.projectData);
+    console.log("- Form Data:", {
+      tipo: formData.tipo,
+      duracao: formData.duracao,
+      abordagem: formData.abordagem,
+      cta: formData.cta,
+      elementos: formData.elementos,
+    });
+
+    if (formData.projectData) {
+      console.log("- Project Context:", {
+        nicho: formData.projectData.nicho,
+        modeloNegocio: formData.projectData.modeloNegocio,
+        publicoIdeal: formData.projectData.publicoIdeal,
+        promessaPrincipal: formData.projectData.promessaPrincipal,
+      });
+    }
+
     // Validate required fields
     if (
       !formData.tipo ||
@@ -274,13 +369,12 @@ export async function POST(request: NextRequest) {
       !formData.abordagem ||
       !formData.cta
     ) {
+      console.log("❌ Missing required fields");
       return NextResponse.json(
         { error: "Todos os campos obrigatórios devem ser preenchidos" },
         { status: 400 }
       );
     }
-
-    console.log(formData);
 
     // Generate VSL with AI
     const vslResult = await generateVSLWithAI(formData);

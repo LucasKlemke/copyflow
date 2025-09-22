@@ -23,37 +23,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type { Creative, Project } from "@/types/project";
 
-interface Criativo {
-  id: string;
-  nome: string;
-  tipo: "vsl" | "sales-page" | "email" | "anuncio";
-  status: "rascunho" | "concluido" | "em-revisao";
-  criadoEm: string;
-  ultimaEdicao: string;
-  thumbnail?: string;
-}
-
-interface Projeto {
-  id: string;
-  name: string;
-  createdAt: string;
-  onboardingData: any;
-}
+// Using Creative type from types/project.ts
 
 const CRIATIVO_TYPES = {
-  vsl: { label: "VSL", icon: Video, color: "bg-blue-100 text-blue-600" },
-  "sales-page": {
+  VSL: { label: "VSL", icon: Video, color: "bg-blue-100 text-blue-600" },
+  SALES_PAGE: {
     label: "Sales Page",
     icon: FileText,
     color: "bg-green-100 text-green-600",
   },
-  email: {
+  EMAIL: {
     label: "Email",
     icon: FileText,
     color: "bg-purple-100 text-purple-600",
   },
-  anuncio: {
+  ANUNCIO: {
     label: "Anúncio",
     icon: FileText,
     color: "bg-yellow-100 text-yellow-600",
@@ -61,18 +47,19 @@ const CRIATIVO_TYPES = {
 };
 
 const STATUS_LABELS = {
-  rascunho: { label: "Rascunho", color: "bg-gray-100 text-gray-600" },
-  "em-revisao": { label: "Em Revisão", color: "bg-yellow-100 text-yellow-600" },
-  concluido: { label: "Concluído", color: "bg-green-100 text-green-600" },
+  DRAFT: { label: "Rascunho", color: "bg-gray-100 text-gray-600" },
+  PUBLISHED: { label: "Publicado", color: "bg-green-100 text-green-600" },
+  ARCHIVED: { label: "Arquivado", color: "bg-yellow-100 text-yellow-600" },
 };
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [projeto, setProjeto] = useState<Projeto | null>(null);
-  const [criativos, setCriativos] = useState<Criativo[]>([]);
+  const [projeto, setProjeto] = useState<Project | null>(null);
+  const [criativos, setCriativos] = useState<Creative[]>([]);
   const [filtroTipo, setFiltroTipo] = useState<string>("todos");
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [searchTerm, setSearchTerm] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     // Check if user is authenticated
@@ -89,16 +76,17 @@ export default function DashboardPage() {
       return;
     }
 
-    setProjeto(JSON.parse(currentProject));
+    const projectData = JSON.parse(currentProject);
+    setProjeto(projectData);
 
     // Check for URL filters from sidebar
     const urlParams = new URLSearchParams(window.location.search);
     const filter = urlParams.get("filter");
 
     if (filter === "favoritos") {
-      setFiltroStatus("concluido");
+      setFiltroStatus("PUBLISHED");
     } else if (filter === "rascunhos") {
-      setFiltroStatus("rascunho");
+      setFiltroStatus("DRAFT");
     } else if (filter === "recentes") {
       // Sort by most recent - this would be handled in the filtering logic
       setSearchTerm("");
@@ -106,43 +94,31 @@ export default function DashboardPage() {
       setFiltroStatus("todos");
     }
 
-    // Load criativos (mock data for now)
-    const mockCriativos: Criativo[] = [
-      {
-        id: "1",
-        nome: "VSL Principal - Curso de Inglês",
-        tipo: "vsl",
-        status: "concluido",
-        criadoEm: "2024-01-15",
-        ultimaEdicao: "2024-01-20",
-      },
-      {
-        id: "2",
-        nome: "Email de Boas-vindas",
-        tipo: "email",
-        status: "em-revisao",
-        criadoEm: "2024-01-18",
-        ultimaEdicao: "2024-01-19",
-      },
-      {
-        id: "3",
-        nome: "Anúncio Facebook - Captação",
-        tipo: "anuncio",
-        status: "rascunho",
-        criadoEm: "2024-01-20",
-        ultimaEdicao: "2024-01-20",
-      },
-    ];
-
-    setCriativos(mockCriativos);
+    // Load criativos from API
+    loadCreatives(projectData.id);
   }, [router]);
+
+  const loadCreatives = async (projectId: string) => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(`/api/creatives?projectId=${projectId}`);
+      if (response.ok) {
+        const creativesData = await response.json();
+        setCriativos(creativesData);
+      }
+    } catch (error) {
+      console.error("Error loading creatives:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleCreateCriativo = (tipo: string) => {
     const routes = {
-      vsl: "/criativos/vsl/create",
-      "sales-page": "/criativos/sales-page/create",
-      email: "/criativos/email/create",
-      anuncio: "/criativos/anuncio/create",
+      VSL: "/criativos/vsl/create",
+      SALES_PAGE: "/criativos/sales-page/create",
+      EMAIL: "/criativos/email/create",
+      ANUNCIO: "/criativos/anuncio/create",
     };
 
     const route = routes[tipo as keyof typeof routes];
@@ -153,16 +129,27 @@ export default function DashboardPage() {
     }
   };
 
-  const handleEditCriativo = (id: string) => {
-    // For now, just show an alert
-    alert(`Edição do criativo ${id} será implementada em breve!`);
+  const handleEditCriativo = (criativo: Creative) => {
+    const routes = {
+      VSL: `/criativos/vsl/edit/${criativo.id}`,
+      SALES_PAGE: `/criativos/sales-page/edit/${criativo.id}`,
+      EMAIL: `/criativos/email/edit/${criativo.id}`,
+      ANUNCIO: `/criativos/anuncio/edit/${criativo.id}`,
+    };
+
+    const route = routes[criativo.type];
+    if (route) {
+      router.push(route);
+    } else {
+      alert(`Edição de ${criativo.type} será implementada em breve!`);
+    }
   };
 
   const filteredCriativos = criativos.filter(criativo => {
-    const matchesTipo = filtroTipo === "todos" || criativo.tipo === filtroTipo;
+    const matchesTipo = filtroTipo === "todos" || criativo.type === filtroTipo;
     const matchesStatus =
       filtroStatus === "todos" || criativo.status === filtroStatus;
-    const matchesSearch = criativo.nome
+    const matchesSearch = criativo.title
       .toLowerCase()
       .includes(searchTerm.toLowerCase());
 
@@ -223,7 +210,7 @@ export default function DashboardPage() {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Concluídos</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {criativos.filter(c => c.status === "concluido").length}
+                  {criativos.filter(c => c.status === "PUBLISHED").length}
                 </p>
               </div>
             </div>
@@ -239,7 +226,7 @@ export default function DashboardPage() {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Em Revisão</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {criativos.filter(c => c.status === "em-revisao").length}
+                  {criativos.filter(c => c.status === "ARCHIVED").length}
                 </p>
               </div>
             </div>
@@ -255,7 +242,7 @@ export default function DashboardPage() {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Rascunhos</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {criativos.filter(c => c.status === "rascunho").length}
+                  {criativos.filter(c => c.status === "DRAFT").length}
                 </p>
               </div>
             </div>
@@ -382,7 +369,7 @@ export default function DashboardPage() {
               </p>
               {criativos.length === 0 && (
                 <Button
-                  onClick={() => handleCreateCriativo("vsl")}
+                  onClick={() => handleCreateCriativo("VSL")}
                   className="flex items-center gap-2"
                 >
                   <Plus className="h-4 w-4" />
@@ -394,7 +381,7 @@ export default function DashboardPage() {
         ) : (
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             {filteredCriativos.map(criativo => {
-              const tipoConfig = CRIATIVO_TYPES[criativo.tipo];
+              const tipoConfig = CRIATIVO_TYPES[criativo.type];
               const statusConfig = STATUS_LABELS[criativo.status];
               const IconComponent = tipoConfig.icon;
 
@@ -416,7 +403,7 @@ export default function DashboardPage() {
                       <div className="mb-3 flex items-start justify-between">
                         <div className="flex-1">
                           <h3 className="mb-1 line-clamp-2 font-medium text-gray-900">
-                            {criativo.nome}
+                            {criativo.title}
                           </h3>
                           <div className="flex items-center gap-2">
                             <span
@@ -443,13 +430,13 @@ export default function DashboardPage() {
                       <div className="space-y-1 text-xs text-gray-500">
                         <div>
                           Criado em{" "}
-                          {new Date(criativo.criadoEm).toLocaleDateString(
+                          {new Date(criativo.createdAt).toLocaleDateString(
                             "pt-BR"
                           )}
                         </div>
                         <div>
                           Editado em{" "}
-                          {new Date(criativo.ultimaEdicao).toLocaleDateString(
+                          {new Date(criativo.updatedAt).toLocaleDateString(
                             "pt-BR"
                           )}
                         </div>
@@ -459,7 +446,7 @@ export default function DashboardPage() {
                         <Button
                           size="sm"
                           className="flex-1"
-                          onClick={() => handleEditCriativo(criativo.id)}
+                          onClick={() => handleEditCriativo(criativo)}
                         >
                           Editar
                         </Button>

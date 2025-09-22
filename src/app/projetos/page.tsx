@@ -25,50 +25,45 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type { Project } from "@/types/project";
 
-interface Projeto {
-  id: string;
-  name: string;
-  description?: string;
-  createdAt: string;
-  updatedAt: string;
-  criativos: number;
-  status: "ativo" | "pausado" | "arquivado";
-  modeloNegocio: string;
-  metaFaturamento: string;
-}
+// Using Project type from types/project.ts
 
 const STATUS_CONFIG = {
-  ativo: { label: "Ativo", color: "bg-green-100 text-green-700" },
-  pausado: { label: "Pausado", color: "bg-yellow-100 text-yellow-700" },
-  arquivado: { label: "Arquivado", color: "bg-gray-100 text-gray-700" },
+  ATIVO: { label: "Ativo", color: "bg-green-100 text-green-700" },
+  PAUSADO: { label: "Pausado", color: "bg-yellow-100 text-yellow-700" },
+  CONCLUIDO: { label: "Concluído", color: "bg-blue-100 text-blue-700" },
+  ARQUIVADO: { label: "Arquivado", color: "bg-gray-100 text-gray-700" },
 };
 
 const MODELO_NEGOCIO_LABELS = {
-  infoprodutos: "Infoprodutos",
+  infoproduto: "Infoprodutos",
   ecommerce: "E-commerce",
   saas: "SaaS/Software",
   servicos: "Serviços",
-  coaching: "Coaching",
-  afiliado: "Afiliado",
+  afiliados: "Afiliados",
   agencia: "Agência",
-  outro: "Outro",
 };
 
 export default function ProjetosPage() {
   const router = useRouter();
-  const [projetos, setProjetos] = useState<Projeto[]>([]);
-  const [currentProject, setCurrentProject] = useState<Projeto | null>(null);
+  const [projetos, setProjetos] = useState<Project[]>([]);
+  const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
+  const [isLoading, setIsLoading] = useState(false);
+  const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
     // Check authentication
-    const user = localStorage.getItem("user");
-    if (!user) {
+    const userStr = localStorage.getItem("user");
+    if (!userStr) {
       router.push("/auth/login");
       return;
     }
+
+    const userData = JSON.parse(userStr);
+    setUser(userData);
 
     // Load current project
     const current = localStorage.getItem("currentProject");
@@ -76,45 +71,27 @@ export default function ProjetosPage() {
       setCurrentProject(JSON.parse(current));
     }
 
-    // Load all projects (mock data)
-    const mockProjetos: Projeto[] = [
-      {
-        id: "1",
-        name: "Curso de Inglês Online",
-        description: "Curso completo de inglês para iniciantes",
-        createdAt: "2024-01-15",
-        updatedAt: "2024-01-20",
-        criativos: 5,
-        status: "ativo",
-        modeloNegocio: "infoprodutos",
-        metaFaturamento: "10k-50k",
-      },
-      {
-        id: "2",
-        name: "E-commerce de Roupas",
-        description: "Loja virtual de moda feminina",
-        createdAt: "2024-01-10",
-        updatedAt: "2024-01-18",
-        criativos: 3,
-        status: "ativo",
-        modeloNegocio: "ecommerce",
-        metaFaturamento: "50k-100k",
-      },
-      {
-        id: "3",
-        name: "Consultoria Empresarial",
-        description: "Serviços de consultoria para PMEs",
-        createdAt: "2024-01-05",
-        updatedAt: "2024-01-12",
-        criativos: 2,
-        status: "pausado",
-        modeloNegocio: "servicos",
-        metaFaturamento: "100k-300k",
-      },
-    ];
-
-    setProjetos(mockProjetos);
+    // Load all projects from API
+    loadProjects(userData.id);
   }, [router]);
+
+  const loadProjects = async (userId: string) => {
+    setIsLoading(true);
+    try {
+      // For now, load all projects and filter by user
+      // In a real app, you'd have an endpoint like /api/users/[userId]/projects
+      const response = await fetch("/api/projects");
+      if (response.ok) {
+        const allProjects = await response.json();
+        // Filter projects by user (for now we'll show all since we don't have user filtering in API yet)
+        setProjetos(allProjects);
+      }
+    } catch (error) {
+      console.error("Error loading projects:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const filteredProjetos = projetos.filter(projeto => {
     const matchesSearch = projeto.name
@@ -129,26 +106,52 @@ export default function ProjetosPage() {
     router.push("/projetos/create");
   };
 
-  const handleEditProject = (projeto: Projeto) => {
+  const handleEditProject = (projeto: Project) => {
     router.push(`/projetos/edit/${projeto.id}`);
   };
 
-  const handleSelectProject = (projeto: Projeto) => {
-    localStorage.setItem("currentProject", JSON.stringify(projeto));
+  const handleSelectProject = (projeto: Project) => {
+    // Map the Project to the format expected by localStorage
+    const projectForStorage = {
+      id: projeto.id,
+      name: projeto.name,
+      description: projeto.description,
+      createdAt: projeto.createdAt,
+      updatedAt: projeto.updatedAt,
+      criativos: projeto._count.creatives,
+      status: "ativo" as const,
+      modeloNegocio: projeto.modeloNegocio,
+      metaFaturamento: projeto.faturamentoAtual,
+    };
+
+    localStorage.setItem("currentProject", JSON.stringify(projectForStorage));
     setCurrentProject(projeto);
     router.push("/dashboard");
   };
 
-  const handleDeleteProject = (projeto: Projeto) => {
+  const handleDeleteProject = async (projeto: Project) => {
     if (
       confirm(`Tem certeza que deseja excluir o projeto "${projeto.name}"?`)
     ) {
-      setProjetos(prev => prev.filter(p => p.id !== projeto.id));
+      try {
+        const response = await fetch(`/api/projects/${projeto.id}`, {
+          method: "DELETE",
+        });
 
-      // If deleting current project, clear it
-      if (currentProject?.id === projeto.id) {
-        localStorage.removeItem("currentProject");
-        setCurrentProject(null);
+        if (response.ok) {
+          setProjetos(prev => prev.filter(p => p.id !== projeto.id));
+
+          // If deleting current project, clear it
+          if (currentProject?.id === projeto.id) {
+            localStorage.removeItem("currentProject");
+            setCurrentProject(null);
+          }
+        } else {
+          alert("Erro ao excluir projeto");
+        }
+      } catch (error) {
+        console.error("Error deleting project:", error);
+        alert("Erro ao excluir projeto");
       }
     }
   };
@@ -255,7 +258,8 @@ export default function ProjetosPage() {
       ) : (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           {filteredProjetos.map(projeto => {
-            const statusConfig = STATUS_CONFIG[projeto.status];
+            const statusConfig =
+              STATUS_CONFIG[projeto.status as keyof typeof STATUS_CONFIG];
             const isCurrentProject = currentProject?.id === projeto.id;
 
             return (
@@ -281,11 +285,9 @@ export default function ProjetosPage() {
                           {statusConfig.label}
                         </Badge>
                         <span className="text-xs text-gray-500">
-                          {
-                            MODELO_NEGOCIO_LABELS[
-                              projeto.modeloNegocio as keyof typeof MODELO_NEGOCIO_LABELS
-                            ]
-                          }
+                          {MODELO_NEGOCIO_LABELS[
+                            projeto.modeloNegocio as keyof typeof MODELO_NEGOCIO_LABELS
+                          ] || projeto.modeloNegocio}
                         </span>
                       </div>
                     </div>
@@ -320,7 +322,7 @@ export default function ProjetosPage() {
                   <div className="mb-4 space-y-2 text-xs text-gray-500">
                     <div className="flex items-center gap-2">
                       <FileText className="h-3 w-3" />
-                      <span>{projeto.criativos} criativo(s)</span>
+                      <span>{projeto._count.creatives} criativo(s)</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Calendar className="h-3 w-3" />

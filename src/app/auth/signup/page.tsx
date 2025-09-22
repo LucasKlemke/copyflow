@@ -11,9 +11,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function SignupPage() {
   const router = useRouter();
+  const { signup } = useAuth();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -55,24 +57,22 @@ export default function SignupPage() {
     }
 
     setIsLoading(true);
+    setErrors({});
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // For now, just store user info in localStorage
-      localStorage.setItem(
-        "user",
-        JSON.stringify({
-          email: formData.email,
-          name: formData.email.split("@")[0],
-        })
+      // Create user via auth hook
+      await signup(
+        formData.email,
+        formData.password,
+        formData.email.split("@")[0]
       );
 
       // Redirect to project creation (onboarding)
       router.push("/onboarding");
-    } catch (err) {
-      setErrors({ general: "Erro ao criar conta. Tente novamente." });
+    } catch (err: any) {
+      setErrors({
+        general: err.message || "Erro ao criar conta. Tente novamente.",
+      });
     } finally {
       setIsLoading(false);
     }

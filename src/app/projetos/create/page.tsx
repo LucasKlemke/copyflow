@@ -23,25 +23,49 @@ export default function CreateProjectPage() {
 
   const handleSubmit = async (data: ProjetoFormData) => {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Get authenticated user
+      const userStr = localStorage.getItem("user");
+      if (!userStr) {
+        router.push("/auth/login");
+        return;
+      }
 
-      // Create new project with complete data
-      const newProject = {
-        id: Date.now().toString(),
-        name: data.nomeProjeto,
-        description: data.promessaPrincipal,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        criativos: 0,
+      const user = JSON.parse(userStr);
+
+      // Create project via API
+      const response = await fetch("/api/projects", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...data,
+          userId: user.id,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to create project");
+      }
+
+      const newProject = await response.json();
+
+      // Save as current project in localStorage for compatibility
+      const projectForStorage = {
+        id: newProject.id,
+        name: newProject.name,
+        description: newProject.description,
+        createdAt: newProject.createdAt,
+        updatedAt: newProject.updatedAt,
+        criativos: newProject._count.creatives,
         status: "ativo" as const,
-        modeloNegocio: data.modeloNegocio,
-        metaFaturamento: data.faturamentoAtual,
+        modeloNegocio: newProject.modeloNegocio,
+        metaFaturamento: newProject.faturamentoAtual,
         onboardingData: data,
       };
 
-      // Save as current project
-      localStorage.setItem("currentProject", JSON.stringify(newProject));
+      localStorage.setItem("currentProject", JSON.stringify(projectForStorage));
 
       // Tela de sucesso será exibida pelo componente
       // Após 3 segundos, será redirecionado automaticamente
