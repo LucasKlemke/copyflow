@@ -135,6 +135,7 @@ const suggestedActions = [
 export default function CreateVSL() {
   const router = useRouter();
   const [project, setProject] = useState<Project | null>(null);
+  const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<VSLFormData>({
     tipo: "",
     duracao: "",
@@ -142,6 +143,8 @@ export default function CreateVSL() {
     cta: "",
     elementos: [],
   });
+
+  const totalSteps = 6; // 5 steps + 1 review step
 
   useEffect(() => {
     // Check authentication and project
@@ -425,8 +428,47 @@ export default function CreateVSL() {
     }, 1500);
   };
 
+  // Validation functions for each step
+  const isStepValid = (step: number): boolean => {
+    switch (step) {
+      case 1:
+        return !!formData.tipo;
+      case 2:
+        return !!formData.duracao;
+      case 3:
+        return !!formData.abordagem;
+      case 4:
+        return !!formData.cta;
+      case 5:
+        return true; // elementos are optional
+      case 6:
+        return true; // review step
+      default:
+        return false;
+    }
+  };
+
   const isFormValid =
     formData.tipo && formData.duracao && formData.abordagem && formData.cta;
+
+  // Navigation functions
+  const nextStep = () => {
+    if (currentStep < totalSteps && isStepValid(currentStep)) {
+      setCurrentStep(prev => prev + 1);
+    }
+  };
+
+  const prevStep = () => {
+    if (currentStep > 1) {
+      setCurrentStep(prev => prev - 1);
+    }
+  };
+
+  const goToStep = (step: number) => {
+    if (step >= 1 && step <= totalSteps) {
+      setCurrentStep(step);
+    }
+  };
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-8">
@@ -440,200 +482,386 @@ export default function CreateVSL() {
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div>
+        <div className="flex-1">
           <h1 className="text-2xl font-medium text-gray-900">Criar VSL</h1>
           <p className="text-sm text-gray-600">
-            Configure os parâmetros para gerar seu script de VSL personalizado
+            {currentStep === 6
+              ? "Revise suas configurações antes de gerar a VSL"
+              : "Configure os parâmetros para gerar seu script de VSL personalizado"}
           </p>
         </div>
       </div>
 
+      {/* Progress Indicator */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium text-gray-900">
+            Etapa {currentStep} de {totalSteps}
+          </span>
+          <span className="text-sm text-gray-600">
+            {Math.round((currentStep / totalSteps) * 100)}% completo
+          </span>
+        </div>
+        <div className="mt-2 h-2 w-full rounded-full bg-gray-200">
+          <div
+            className="h-2 rounded-full bg-blue-600 transition-all duration-300"
+            style={{ width: `${(currentStep / totalSteps) * 100}%` }}
+          ></div>
+        </div>
+
+        {/* Step Indicators */}
+        <div className="mt-4 flex justify-between">
+          {Array.from({ length: totalSteps }, (_, i) => i + 1).map(step => (
+            <div
+              key={step}
+              className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-xs font-medium transition-all ${
+                step < currentStep
+                  ? "bg-blue-600 text-white"
+                  : step === currentStep
+                    ? "bg-blue-100 text-blue-600 ring-2 ring-blue-600"
+                    : "bg-gray-200 text-gray-600"
+              }`}
+              onClick={() => step <= currentStep && goToStep(step)}
+            >
+              {step < currentStep ? <Check className="h-4 w-4" /> : step}
+            </div>
+          ))}
+        </div>
+
+        {/* Step Labels */}
+        <div className="mt-2 flex justify-between">
+          {["Tipo", "Duração", "Abordagem", "CTA", "Elementos", "Revisão"].map(
+            (label, index) => (
+              <div
+                key={index}
+                className={`text-center text-xs ${
+                  index + 1 === currentStep
+                    ? "font-medium text-blue-600"
+                    : "text-gray-500"
+                }`}
+                style={{ maxWidth: "60px" }}
+              >
+                {label}
+              </div>
+            )
+          )}
+        </div>
+      </div>
+
       <div className="space-y-8">
-        {/* 1. Tipo de VSL */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">1. Tipo de VSL</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              {tiposVSL.map(tipo => (
-                <div
-                  key={tipo.id}
-                  className={`cursor-pointer rounded-lg border-2 p-4 transition-all hover:border-blue-300 ${
-                    formData.tipo === tipo.id
-                      ? "border-blue-500 bg-blue-50"
-                      : "border-gray-200"
-                  }`}
-                  onClick={() =>
-                    setFormData(prev => ({ ...prev, tipo: tipo.id }))
-                  }
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-medium text-gray-900">
-                        {tipo.label}
-                      </h3>
-                      <p className="text-sm text-gray-600">{tipo.subtitle}</p>
-                    </div>
-                    {formData.tipo === tipo.id && (
-                      <Check className="h-5 w-5 text-blue-600" />
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* 2. Duração Desejada */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">2. Duração Desejada</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              {duracoes.map(duracao => (
-                <div
-                  key={duracao.id}
-                  className={`cursor-pointer rounded-lg border-2 p-4 text-center transition-all hover:border-blue-300 ${
-                    formData.duracao === duracao.id
-                      ? "border-blue-500 bg-blue-50"
-                      : "border-gray-200"
-                  }`}
-                  onClick={() =>
-                    setFormData(prev => ({ ...prev, duracao: duracao.id }))
-                  }
-                >
-                  <div className="flex items-center justify-center gap-2">
-                    <span className="font-medium text-gray-900">
-                      {duracao.label}
-                    </span>
-                    {formData.duracao === duracao.id && (
-                      <Check className="h-4 w-4 text-blue-600" />
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* 3. Abordagem Principal */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">3. Abordagem Principal</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              {abordagens.map(abordagem => (
-                <div
-                  key={abordagem.id}
-                  className={`cursor-pointer rounded-lg border-2 p-4 transition-all hover:border-blue-300 ${
-                    formData.abordagem === abordagem.id
-                      ? "border-blue-500 bg-blue-50"
-                      : "border-gray-200"
-                  }`}
-                  onClick={() =>
-                    setFormData(prev => ({ ...prev, abordagem: abordagem.id }))
-                  }
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl">{abordagem.emoji}</span>
+        {/* Step 1: Tipo de VSL */}
+        {currentStep === 1 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Tipo de VSL</CardTitle>
+              <p className="text-sm text-gray-600">
+                Escolha o tipo de VSL baseado no valor do seu produto
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                {tiposVSL.map(tipo => (
+                  <div
+                    key={tipo.id}
+                    className={`cursor-pointer rounded-lg border-2 p-4 transition-all hover:border-blue-300 ${
+                      formData.tipo === tipo.id
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-200"
+                    }`}
+                    onClick={() =>
+                      setFormData(prev => ({ ...prev, tipo: tipo.id }))
+                    }
+                  >
+                    <div className="flex items-center justify-between">
                       <div>
                         <h3 className="font-medium text-gray-900">
-                          {abordagem.label}
+                          {tipo.label}
                         </h3>
-                        <p className="text-sm text-gray-600">
-                          ({abordagem.subtitle})
-                        </p>
+                        <p className="text-sm text-gray-600">{tipo.subtitle}</p>
                       </div>
+                      {formData.tipo === tipo.id && (
+                        <Check className="h-5 w-5 text-blue-600" />
+                      )}
                     </div>
-                    {formData.abordagem === abordagem.id && (
-                      <Check className="h-5 w-5 text-blue-600" />
-                    )}
                   </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-        {/* 4. Call-to-Action Final */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">4. Call-to-Action Final</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              {ctas.map(cta => (
-                <div
-                  key={cta.id}
-                  className={`cursor-pointer rounded-lg border-2 p-4 transition-all hover:border-blue-300 ${
-                    formData.cta === cta.id
-                      ? "border-blue-500 bg-blue-50"
-                      : "border-gray-200"
-                  }`}
-                  onClick={() =>
-                    setFormData(prev => ({ ...prev, cta: cta.id }))
-                  }
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-gray-900">
-                      "{cta.label}"
-                    </span>
-                    {formData.cta === cta.id && (
-                      <Check className="h-5 w-5 text-blue-600" />
-                    )}
+        {/* Step 2: Duração Desejada */}
+        {currentStep === 2 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Duração Desejada</CardTitle>
+              <p className="text-sm text-gray-600">
+                Selecione a duração ideal para sua VSL
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                {duracoes.map(duracao => (
+                  <div
+                    key={duracao.id}
+                    className={`cursor-pointer rounded-lg border-2 p-4 text-center transition-all hover:border-blue-300 ${
+                      formData.duracao === duracao.id
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-200"
+                    }`}
+                    onClick={() =>
+                      setFormData(prev => ({ ...prev, duracao: duracao.id }))
+                    }
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="font-medium text-gray-900">
+                        {duracao.label}
+                      </span>
+                      {formData.duracao === duracao.id && (
+                        <Check className="h-4 w-4 text-blue-600" />
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-        {/* 5. Elementos Extras */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">
-              5. Elementos Extras (Múltipla escolha)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-              {elementos.map(elemento => (
-                <div
-                  key={elemento.id}
-                  className={`cursor-pointer rounded-lg border-2 p-4 transition-all hover:border-blue-300 ${
-                    formData.elementos.includes(elemento.id)
-                      ? "border-blue-500 bg-blue-50"
-                      : "border-gray-200"
-                  }`}
-                  onClick={() => handleElementoToggle(elemento.id)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <span className="text-xl">{elemento.emoji}</span>
-                      <div>
-                        <h3 className="font-medium text-gray-900">
-                          {elemento.label}
-                        </h3>
-                        {elemento.subtitle && (
+        {/* Step 3: Abordagem Principal */}
+        {currentStep === 3 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Abordagem Principal</CardTitle>
+              <p className="text-sm text-gray-600">
+                Escolha a estratégia principal para sua VSL
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                {abordagens.map(abordagem => (
+                  <div
+                    key={abordagem.id}
+                    className={`cursor-pointer rounded-lg border-2 p-4 transition-all hover:border-blue-300 ${
+                      formData.abordagem === abordagem.id
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-200"
+                    }`}
+                    onClick={() =>
+                      setFormData(prev => ({
+                        ...prev,
+                        abordagem: abordagem.id,
+                      }))
+                    }
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">{abordagem.emoji}</span>
+                        <div>
+                          <h3 className="font-medium text-gray-900">
+                            {abordagem.label}
+                          </h3>
                           <p className="text-sm text-gray-600">
-                            ({elemento.subtitle})
+                            ({abordagem.subtitle})
                           </p>
-                        )}
+                        </div>
                       </div>
+                      {formData.abordagem === abordagem.id && (
+                        <Check className="h-5 w-5 text-blue-600" />
+                      )}
                     </div>
-                    {formData.elementos.includes(elemento.id) && (
-                      <Check className="h-5 w-5 text-blue-600" />
-                    )}
                   </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Step 4: Call-to-Action Final */}
+        {currentStep === 4 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Call-to-Action Final</CardTitle>
+              <p className="text-sm text-gray-600">
+                Defina como o viewer deve tomar ação após assistir a VSL
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                {ctas.map(cta => (
+                  <div
+                    key={cta.id}
+                    className={`cursor-pointer rounded-lg border-2 p-4 transition-all hover:border-blue-300 ${
+                      formData.cta === cta.id
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-200"
+                    }`}
+                    onClick={() =>
+                      setFormData(prev => ({ ...prev, cta: cta.id }))
+                    }
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-gray-900">
+                        "{cta.label}"
+                      </span>
+                      {formData.cta === cta.id && (
+                        <Check className="h-5 w-5 text-blue-600" />
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Step 5: Elementos Extras */}
+        {currentStep === 5 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">
+                Elementos Extras (Opcional)
+              </CardTitle>
+              <p className="text-sm text-gray-600">
+                Selecione elementos adicionais para fortalecer sua VSL
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+                {elementos.map(elemento => (
+                  <div
+                    key={elemento.id}
+                    className={`cursor-pointer rounded-lg border-2 p-4 transition-all hover:border-blue-300 ${
+                      formData.elementos.includes(elemento.id)
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-200"
+                    }`}
+                    onClick={() => handleElementoToggle(elemento.id)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xl">{elemento.emoji}</span>
+                        <div>
+                          <h3 className="font-medium text-gray-900">
+                            {elemento.label}
+                          </h3>
+                          {elemento.subtitle && (
+                            <p className="text-sm text-gray-600">
+                              ({elemento.subtitle})
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      {formData.elementos.includes(elemento.id) && (
+                        <Check className="h-5 w-5 text-blue-600" />
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Step 6: Revisão */}
+        {currentStep === 6 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">
+                Revisão das Configurações
+              </CardTitle>
+              <p className="text-sm text-gray-600">
+                Confirme suas escolhas antes de gerar a VSL
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Tipo */}
+              <div className="flex items-center justify-between border-b pb-4">
+                <div>
+                  <h4 className="font-medium text-gray-900">Tipo de VSL</h4>
+                  <p className="text-sm text-gray-600">
+                    {tiposVSL.find(t => t.id === formData.tipo)?.label} -{" "}
+                    {tiposVSL.find(t => t.id === formData.tipo)?.subtitle}
+                  </p>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                <Button variant="outline" size="sm" onClick={() => goToStep(1)}>
+                  <Edit3 className="mr-2 h-4 w-4" />
+                  Editar
+                </Button>
+              </div>
+
+              {/* Duração */}
+              <div className="flex items-center justify-between border-b pb-4">
+                <div>
+                  <h4 className="font-medium text-gray-900">Duração</h4>
+                  <p className="text-sm text-gray-600">
+                    {duracoes.find(d => d.id === formData.duracao)?.label}
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => goToStep(2)}>
+                  <Edit3 className="mr-2 h-4 w-4" />
+                  Editar
+                </Button>
+              </div>
+
+              {/* Abordagem */}
+              <div className="flex items-center justify-between border-b pb-4">
+                <div>
+                  <h4 className="font-medium text-gray-900">
+                    Abordagem Principal
+                  </h4>
+                  <p className="text-sm text-gray-600">
+                    {abordagens.find(a => a.id === formData.abordagem)?.emoji}{" "}
+                    {abordagens.find(a => a.id === formData.abordagem)?.label} (
+                    {
+                      abordagens.find(a => a.id === formData.abordagem)
+                        ?.subtitle
+                    }
+                    )
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => goToStep(3)}>
+                  <Edit3 className="mr-2 h-4 w-4" />
+                  Editar
+                </Button>
+              </div>
+
+              {/* CTA */}
+              <div className="flex items-center justify-between border-b pb-4">
+                <div>
+                  <h4 className="font-medium text-gray-900">Call-to-Action</h4>
+                  <p className="text-sm text-gray-600">
+                    "{ctas.find(c => c.id === formData.cta)?.label}"
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => goToStep(4)}>
+                  <Edit3 className="mr-2 h-4 w-4" />
+                  Editar
+                </Button>
+              </div>
+
+              {/* Elementos */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-medium text-gray-900">
+                    Elementos Extras
+                  </h4>
+                  <p className="text-sm text-gray-600">
+                    {formData.elementos.length > 0
+                      ? formData.elementos
+                          .map(el => elementos.find(e => e.id === el)?.label)
+                          .join(", ")
+                      : "Nenhum elemento extra selecionado"}
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => goToStep(5)}>
+                  <Edit3 className="mr-2 h-4 w-4" />
+                  Editar
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Error Display */}
         {error && (
@@ -1017,43 +1245,46 @@ export default function CreateVSL() {
           </div>
         )}
 
-        {/* Resultado Preview - only show if no results yet */}
-        {!vslResult && (
-          <Card className="border-green-200 bg-green-50">
-            <CardHeader>
-              <CardTitle className="text-lg text-green-800">
-                Resultado Gerado
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2 text-sm text-green-700">
-                <p>✓ Script completo da VSL</p>
-                <p>✓ Slides sugeridos (títulos)</p>
-                <p>✓ Tempo estimado por seção</p>
-                <p>✓ CTAs strategicamente posicionados</p>
-                <p>✓ Versão para teleprompter</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Submit Button */}
-        <div className="flex justify-center pt-4">
+        {/* Navigation Buttons */}
+        <div className="flex items-center justify-between pt-8">
           <Button
-            onClick={handleSubmit}
-            disabled={!isFormValid || isGenerating}
-            className="min-w-48 bg-blue-600 hover:bg-blue-700"
-            size="lg"
+            variant="outline"
+            onClick={prevStep}
+            disabled={currentStep === 1}
+            className="flex items-center gap-2"
           >
-            {isGenerating ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Gerando VSL...
-              </>
-            ) : (
-              "Gerar VSL Completa"
-            )}
+            <ArrowLeft className="h-4 w-4" />
+            Anterior
           </Button>
+
+          <div className="flex gap-4">
+            {currentStep < totalSteps ? (
+              <Button
+                onClick={nextStep}
+                disabled={!isStepValid(currentStep)}
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
+              >
+                Próximo
+                <ArrowLeft className="h-4 w-4 rotate-180" />
+              </Button>
+            ) : (
+              <Button
+                onClick={handleSubmit}
+                disabled={!isFormValid || isGenerating}
+                className="min-w-48 bg-green-600 hover:bg-green-700"
+                size="lg"
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Gerando VSL...
+                  </>
+                ) : (
+                  "Gerar VSL Completa"
+                )}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </div>
