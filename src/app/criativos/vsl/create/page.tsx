@@ -24,6 +24,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { AutocompleteTextarea } from "@/components/ui/autocomplete-textarea";
+import { AutocompleteInput } from "@/components/ui/autocomplete-input";
 import type {
   ChatMessage,
   Project,
@@ -980,7 +982,7 @@ export default function CreateVSL() {
                     {/* Chat Input */}
                     <div className="border-t bg-white p-4">
                       <div className="flex gap-2">
-                        <Input
+                        <AutocompleteInput
                           placeholder="Digite sua mensagem..."
                           value={currentMessage}
                           onChange={e => setCurrentMessage(e.target.value)}
@@ -989,6 +991,8 @@ export default function CreateVSL() {
                               handleSendMessage();
                             }
                           }}
+                          enableAutocomplete={true}
+                          minCharsForSuggestion={3}
                         />
                         <Button
                           size="sm"
@@ -1066,11 +1070,13 @@ export default function CreateVSL() {
 
                 {/* Editable Content */}
                 <div className="flex-1 p-6">
-                  <Textarea
+                  <AutocompleteTextarea
                     value={editableScript}
                     onChange={e => setEditableScript(e.target.value)}
                     className="h-[700px] w-full resize-none border-0 p-0 font-mono text-sm leading-relaxed focus:ring-0"
                     placeholder="Seu script VSL aparecerá aqui..."
+                    enableAutocomplete={true}
+                    minCharsForSuggestion={3}
                   />
                 </div>
 
