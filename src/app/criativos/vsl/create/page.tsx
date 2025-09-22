@@ -23,13 +23,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import type {
   ChatMessage,
   Project,
-  SuggestedAction,
   VSLFormData,
   VSLResult,
 } from "@/types";
@@ -1072,7 +1069,7 @@ export default function CreateVSL() {
                   <Textarea
                     value={editableScript}
                     onChange={e => setEditableScript(e.target.value)}
-                    className="min-h-full w-full resize-none border-0 p-0 font-mono text-sm leading-relaxed focus:ring-0"
+                    className="h-[700px] w-full resize-none border-0 p-0 font-mono text-sm leading-relaxed focus:ring-0"
                     placeholder="Seu script VSL aparecerá aqui..."
                   />
                 </div>

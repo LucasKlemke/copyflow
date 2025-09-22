@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { openai } from "@ai-sdk/openai";
+import { convertToModelMessages, generateText } from "ai";
+
 interface VSLRequest {
   tipo: string;
   duracao: string;
@@ -21,11 +24,8 @@ interface VSLResponse {
   teleprompter: string;
 }
 
-// Mock AI generation - replace with your preferred AI service
+// AI-powered VSL generation
 async function generateVSLWithAI(formData: VSLRequest): Promise<VSLResponse> {
-  // This is where you would integrate with OpenAI, Claude, or another AI service
-  // For now, we'll return a structured mock response based on the form data
-
   const tipoLabels = {
     curta: "VSL Curta (até R$ 497)",
     media: "VSL Média (R$ 497-1.997)",
@@ -47,93 +47,160 @@ async function generateVSLWithAI(formData: VSLRequest): Promise<VSLResponse> {
     garantia: "Garantia Destacada",
   };
 
-  // Generate script based on form data
-  const script = `
-# SCRIPT VSL - ${tipoLabels[formData.tipo as keyof typeof tipoLabels]}
-**Duração:** ${formData.duracao}
-**Abordagem:** ${abordagemLabels[formData.abordagem as keyof typeof abordagemLabels]}
+  const ctaLabels = {
+    botao: "Botão na página",
+    link: "Link na descrição",
+    whatsapp: "WhatsApp",
+    telefone: "Telefone",
+  };
 
-## INTRODUÇÃO (0:00 - 1:30)
-${
-  formData.abordagem === "historia"
-    ? "Olá, meu nome é [SEU NOME] e hoje eu quero compartilhar com você uma história que mudou completamente a minha vida..."
-    : formData.abordagem === "dados"
-      ? "Você sabia que 97% das pessoas que tentam [PROBLEMA] falham miseravelmente? Mas existe um grupo seleto de 3% que consegue resultados extraordinários..."
-      : formData.abordagem === "problema"
-        ? "Se você está assistindo este vídeo, provavelmente você está enfrentando [PROBLEMA ESPECÍFICO] e já tentou de tudo, mas nada funcionou até agora..."
-        : "Há alguns anos atrás, eu descobri algo que a indústria de [NICHO] não quer que você saiba..."
-}
+  // Construir prompt dinâmico baseado nas respostas do formulário
+  let prompt = `Você é um especialista em criação de VSLs (Video Sales Letters) de alta conversão. 
 
-## DESENVOLVIMENTO (1:30 - ${formData.duracao === "5-8" ? "6:00" : formData.duracao === "12-15" ? "12:00" : formData.duracao === "20-25" ? "20:00" : "25:00"})
+Crie um script completo e profissional de VSL baseado nas seguintes especificações:
 
-### Agitação do Problema
-- Demonstre como o problema atual está afetando a vida da pessoa
-- Mostre as consequências de não resolver isso agora
-- Crie urgência emocional
+**CONFIGURAÇÕES DA VSL:**
+- Tipo: ${tipoLabels[formData.tipo as keyof typeof tipoLabels]}
+- Duração total: ${formData.duracao} minutos
+- Abordagem principal: ${abordagemLabels[formData.abordagem as keyof typeof abordagemLabels]}
+- Call-to-action: ${ctaLabels[formData.cta as keyof typeof ctaLabels]}
+- Elementos incluídos: ${formData.elementos.map(el => elementosLabels[el as keyof typeof elementosLabels]).join(", ")}
 
-### Apresentação da Solução
-- Revele sua metodologia/produto
-- Explique como funciona de forma simples
-- Demonstre os benefícios únicos
+**INSTRUÇÕES ESPECÍFICAS:**
 
-${
-  formData.elementos.includes("prova-social")
-    ? `
-### Prova Social
-- Depoimento de [CLIENTE 1]: "Resultado específico em X tempo"
-- Depoimento de [CLIENTE 2]: "Transformação completa"
-- Estatísticas de sucesso dos seus clientes
-`
-    : ""
-}
+1. **ESTRUTURA OBRIGATÓRIA:**
+   - Introdução: 0:00 - 1:30 (gancho forte usando a abordagem ${abordagemLabels[formData.abordagem as keyof typeof abordagemLabels]})
+   - Desenvolvimento: 1:30 até os últimos 2-3 minutos
+   - Call-to-action final: últimos 2-3 minutos
 
-${
-  formData.elementos.includes("bonus")
-    ? `
-### Bônus Exclusivos
-- Bônus #1: [NOME DO BÔNUS] (Valor: R$ XXX)
-- Bônus #2: [NOME DO BÔNUS] (Valor: R$ XXX)
-- Bônus #3: [NOME DO BÔNUS] (Valor: R$ XXX)
-`
-    : ""
-}
+2. **ABORDAGEM ESPECÍFICA:**`;
 
-## CALL TO ACTION FINAL
-${
-  formData.cta === "botao"
-    ? "Agora eu quero que você clique no botão logo abaixo desta tela..."
-    : formData.cta === "link"
-      ? "O link está aqui na descrição deste vídeo..."
-      : formData.cta === "whatsapp"
-        ? "Pega o seu celular agora e me envia uma mensagem no WhatsApp..."
-        : "Pegue o telefone agora e ligue para o número que está aparecendo na sua tela..."
-}
+  // Adicionar instruções específicas por abordagem
+  switch (formData.abordagem) {
+    case "historia":
+      prompt += `
+   - Comece com uma história pessoal envolvente
+   - Use storytelling para criar conexão emocional
+   - Mostre a transformação pessoal`;
+      break;
+    case "dados":
+      prompt += `
+   - Apresente estatísticas impactantes logo no início
+   - Use dados para estabelecer autoridade
+   - Baseie argumentos em evidências concretas`;
+      break;
+    case "problema":
+      prompt += `
+   - Identifique e agite o problema principal
+   - Mostre as consequências de não resolver
+   - Crie urgência através da dor`;
+      break;
+    case "revelacao":
+      prompt += `
+   - Desperte curiosidade com uma revelação
+   - Construa mistério e interesse
+   - Revele segredos da indústria`;
+      break;
+  }
 
-${
-  formData.elementos.includes("urgencia")
-    ? `
-⏰ **ATENÇÃO:** Esta oferta especial expira em 24 horas!
-`
-    : ""
-}
+  prompt += `
 
-${
-  formData.elementos.includes("escassez")
-    ? `
-💰 **VAGAS LIMITADAS:** Apenas 50 pessoas terão acesso a esta oportunidade!
-`
-    : ""
-}
+3. **ELEMENTOS OBRIGATÓRIOS A INCLUIR:**`;
 
-${
-  formData.elementos.includes("garantia")
-    ? `
-📞 **GARANTIA TOTAL:** 30 dias para testar sem riscos. Não funcionou? Devolvemos 100% do seu dinheiro!
-`
-    : ""
-}
-`.trim();
+  // Adicionar instruções específicas para cada elemento selecionado
+  formData.elementos.forEach(elemento => {
+    switch (elemento) {
+      case "prova-social":
+        prompt += `
+   - Incluir 2-3 depoimentos específicos e detalhados
+   - Mencionar resultados concretos e timeframes
+   - Adicionar estatísticas de sucesso dos clientes`;
+        break;
+      case "urgencia":
+        prompt += `
+   - Criar senso de urgência com prazo limitado
+   - Mencionar oferta especial com tempo determinado
+   - Usar linguagem que incentive ação imediata`;
+        break;
+      case "escassez":
+        prompt += `
+   - Limitar número de vagas ou produtos disponíveis
+   - Criar exclusividade na oferta
+   - Mencionar quantidades específicas restantes`;
+        break;
+      case "bonus":
+        prompt += `
+   - Apresentar 3-4 bônus exclusivos com valores específicos
+   - Detalhar cada bônus e seu benefício
+   - Calcular valor total dos bônus`;
+        break;
+      case "garantia":
+        prompt += `
+   - Oferecer garantia robusta (30-90 dias)
+   - Eliminar riscos da compra
+   - Detalhar processo de reembolso`;
+        break;
+    }
+  });
 
+  prompt += `
+
+4. **CALL-TO-ACTION ESPECÍFICO:**`;
+
+  // Adicionar instruções específicas para o CTA escolhido
+  switch (formData.cta) {
+    case "botao":
+      prompt += `
+   - Direcionar para clicar no botão abaixo do vídeo
+   - Explicar o que acontece após o clique
+   - Criar urgência para a ação`;
+      break;
+    case "link":
+      prompt += `
+   - Mencionar link na descrição do vídeo
+   - Instruir onde encontrar o link
+   - Facilitar o acesso`;
+      break;
+    case "whatsapp":
+      prompt += `
+   - Solicitar mensagem no WhatsApp
+   - Fornecer número específico (usar placeholder)
+   - Explicar o que escrever na mensagem`;
+      break;
+    case "telefone":
+      prompt += `
+   - Solicitar ligação telefônica
+   - Mencionar número na tela (usar placeholder)
+   - Criar urgência para ligar agora`;
+      break;
+  }
+
+  prompt += `
+
+5. **FORMATO DE SAÍDA:**
+   - Retorne APENAS o script em markdown
+   - Use títulos e subtítulos para organizar
+   - Inclua marcações de tempo
+   - Escreva como se fosse para ser falado diretamente
+   - Use linguagem natural e persuasiva
+   - Adapte o tom para o público brasileiro
+   - Use "você" para se dirigir ao espectador
+
+6. **DURAÇÃO E TIMING:**
+   - Respeite a duração total de ${formData.duracao} minutos
+   - Distribua o conteúdo proporcionalmente
+   - Inclua pausas naturais e transições
+   - Mantenha ritmo adequado para conversão
+
+Agora crie o script completo da VSL seguindo todas essas diretrizes.`;
+
+  // Gerar script com IA
+  const { text: aiGeneratedScript } = await generateText({
+    model: openai("gpt-4o"),
+    prompt: prompt,
+  });
+
+  // Gerar slides baseados na estrutura da VSL
   const slides = [
     "Slide 1: Gancho Inicial",
     `Slide 2: ${formData.abordagem === "historia" ? "Minha História" : formData.abordagem === "dados" ? "Estatísticas Impactantes" : formData.abordagem === "problema" ? "O Grande Problema" : "A Grande Revelação"}`,
@@ -151,40 +218,29 @@ ${
     "Slide Final: Call to Action",
   ];
 
+  // Calcular tempos estimados baseados na duração escolhida
+  const duracaoMinutos = parseInt(formData.duracao.split("-")[1]) || 8;
   const tempoEstimado = {
     introducao: "0:00 - 1:30",
-    desenvolvimento:
-      formData.duracao === "5-8"
-        ? "1:30 - 6:00"
-        : formData.duracao === "12-15"
-          ? "1:30 - 12:00"
-          : formData.duracao === "20-25"
-            ? "1:30 - 20:00"
-            : "1:30 - 25:00",
-    cta:
-      formData.duracao === "5-8"
-        ? "6:00 - 8:00"
-        : formData.duracao === "12-15"
-          ? "12:00 - 15:00"
-          : formData.duracao === "20-25"
-            ? "20:00 - 25:00"
-            : "25:00 - 30:00",
-    total: formData.duracao,
+    desenvolvimento: `1:30 - ${duracaoMinutos - 2}:00`,
+    cta: `${duracaoMinutos - 2}:00 - ${duracaoMinutos}:00`,
+    total: `${duracaoMinutos} minutos`,
   };
 
+  // Gerar posições de CTAs baseadas na duração e elementos
   const ctasPositions = [
     "CTA Suave aos 3:00 - 'Continue assistindo para descobrir...'",
-    `CTA Principal aos ${formData.duracao === "5-8" ? "6:00" : formData.duracao === "12-15" ? "12:00" : "20:00"} - CTA final completo`,
+    `CTA Principal aos ${duracaoMinutos - 2}:00 - CTA final completo`,
     ...(formData.elementos.includes("urgencia")
-      ? ["CTA de Urgência - Enfatizar prazo"]
+      ? ["CTA de Urgência - Enfatizar prazo limitado"]
       : []),
     ...(formData.elementos.includes("escassez")
       ? ["CTA de Escassez - Enfatizar vagas limitadas"]
       : []),
   ];
 
-  // Convert script to teleprompter format (uppercase, shorter lines)
-  const teleprompter = script
+  // Converter script para formato teleprompter (maiúsculo, linhas menores)
+  const teleprompter = aiGeneratedScript
     .toUpperCase()
     .replace(/\n\n/g, "\n")
     .replace(/### /g, "")
@@ -199,7 +255,7 @@ ${
     .join("\n");
 
   return {
-    script,
+    script: aiGeneratedScript,
     slides,
     tempoEstimado,
     ctasPositions,
@@ -223,6 +279,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    console.log(formData);
 
     // Generate VSL with AI
     const vslResult = await generateVSLWithAI(formData);
